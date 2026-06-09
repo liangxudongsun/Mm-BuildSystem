@@ -1,8 +1,10 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// 简单第一人称控制器
 /// 用于建造系统演示的基础移动和视角控制
+/// 使用新输入系统（Keyboard.current / Mouse.current 直接读设备）
 /// </summary>
 public class SimpleFirstPersonController : MonoBehaviour
 {
@@ -36,6 +38,9 @@ public class SimpleFirstPersonController : MonoBehaviour
     private float currentSpeed;
     private bool isSprinting = false;
 
+    // 新输入系统的鼠标 delta 是像素值，比旧 GetAxis 大一个数量级，需要缩放
+    private const float MouseDeltaScale = 0.05f;
+
     private void Start()
     {
         // 锁定鼠标
@@ -59,6 +64,7 @@ public class SimpleFirstPersonController : MonoBehaviour
         HandleLook();
         HandleJump();
         ApplyGravity();
+        HandleCursorLock();
     }
 
     /// <summary>
@@ -66,14 +72,16 @@ public class SimpleFirstPersonController : MonoBehaviour
     /// </summary>
     private void HandleLook()
     {
-        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity;
-        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity;
+        if (Mouse.current == null)
+            return;
+
+        Vector2 mouseDelta = Mouse.current.delta.ReadValue() * mouseSensitivity * MouseDeltaScale;
 
         // 水平旋转：旋转整个玩家对象
-        transform.Rotate(Vector3.up * mouseX);
+        transform.Rotate(Vector3.up * mouseDelta.x);
 
         // 垂直旋转：只旋转相机
-        verticalRotation -= mouseY;
+        verticalRotation -= mouseDelta.y;
         verticalRotation = Mathf.Clamp(verticalRotation, -verticalLookLimit, verticalLookLimit);
 
         if (playerCamera != null)
@@ -85,12 +93,16 @@ public class SimpleFirstPersonController : MonoBehaviour
     /// </summary>
     private void HandleMovement()
     {
+        var keyboard = Keyboard.current;
+        if (keyboard == null)
+            return;
+
         // 冲刺检测
-        isSprinting = Input.GetKey(KeyCode.LeftShift);
+        isSprinting = keyboard.leftShiftKey.isPressed;
         currentSpeed = isSprinting ? sprintSpeed : moveSpeed;
 
-        float horizontal = Input.GetAxis("Horizontal");
-        float vertical = Input.GetAxis("Vertical");
+        float horizontal = (keyboard.dKey.isPressed ? 1f : 0f) - (keyboard.aKey.isPressed ? 1f : 0f);
+        float vertical = (keyboard.wKey.isPressed ? 1f : 0f) - (keyboard.sKey.isPressed ? 1f : 0f);
 
         // 基于玩家朝向计算移动方向
         moveDirection = transform.right * horizontal + transform.forward * vertical;
@@ -109,7 +121,10 @@ public class SimpleFirstPersonController : MonoBehaviour
     /// </summary>
     private void HandleJump()
     {
-        if (Input.GetButtonDown("Jump") && isGrounded)
+        if (Keyboard.current == null)
+            return;
+
+        if (Keyboard.current.spaceKey.wasPressedThisFrame && isGrounded)
         {
             velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
         }
@@ -136,7 +151,7 @@ public class SimpleFirstPersonController : MonoBehaviour
     }
 
     /// <summary>
-    /// 解锁鼠标（当按下ESC时）
+    /// 解锁鼠标（窗口失焦时）
     /// </summary>
     private void OnApplicationFocus(bool hasFocus)
     {
@@ -148,12 +163,12 @@ public class SimpleFirstPersonController : MonoBehaviour
     }
 
     /// <summary>
-    /// 处理ESC键解锁鼠标
+    /// 处理ESC键解锁鼠标 / 点击重新锁定
     /// </summary>
-    private void OnGUI()
+    private void HandleCursorLock()
     {
         // 按ESC解锁/锁定鼠标
-        if (Input.GetKeyDown(KeyCode.Escape))
+        if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
         {
             if (Cursor.lockState == CursorLockMode.Locked)
             {
@@ -168,9 +183,11 @@ public class SimpleFirstPersonController : MonoBehaviour
         }
 
         // 按下任意鼠标按钮时重新锁定
-        if (Cursor.lockState == CursorLockMode.None && Cursor.visible)
+        if (Cursor.lockState == CursorLockMode.None && Cursor.visible && Mouse.current != null)
         {
-            if (Input.GetMouseButtonDown(0) || Input.GetMouseButtonDown(1) || Input.GetMouseButtonDown(2))
+            if (Mouse.current.leftButton.wasPressedThisFrame ||
+                Mouse.current.rightButton.wasPressedThisFrame ||
+                Mouse.current.middleButton.wasPressedThisFrame)
             {
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
