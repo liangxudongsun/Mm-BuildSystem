@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 1121855081118333715}
   - component: {fileID: 6614322755026721967}
   - component: {fileID: 7043535443040476141}
-  m_Layer: 10
+  m_Layer: 6
   m_Name: Dirt
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -89,6 +89,7 @@ MeshRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
+  m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
 --- !u!65 &7043535443040476141
 BoxCollider:

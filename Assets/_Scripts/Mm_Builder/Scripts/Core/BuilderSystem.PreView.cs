@@ -1,0 +1,96 @@
+using UnityEngine;
+
+namespace Mm_Budier
+{
+    /// <summary>
+    /// 预览模块 全局持有一个临时方块 动态切换网格材质位置旋转缩放
+    /// </summary>
+    public partial class BuilderSystem
+    {
+        //预览方块
+        private GameObject preObj;
+        //预览方块网格渲染器
+        private MeshRenderer preMeshRenderer;
+        //预览方块网格过滤器
+        private MeshFilter preMeshFilter;
+        //当前预览方块数据
+        private CubeData currentPreCubeData;
+
+        /// <summary>
+        /// 初始化预览方块
+        /// </summary>
+        private void InitPreView()
+        {
+            //如果预览方块根节点为空则创建一个
+            if (preViewRoot == null)
+            {
+                var root = transform.Find("PreviewRoot");
+                preViewRoot = root != null ? root : new GameObject("PreViewRoot").transform;
+                preViewRoot.SetParent(transform, false);
+            }
+
+            //创建预览方块
+            preObj = new GameObject("PreViewObj");
+            preObj.transform.SetParent(preViewRoot, false);
+            //添加网格过滤器和渲染器
+            preMeshFilter = preObj.AddComponent<MeshFilter>();
+            preMeshRenderer = preObj.AddComponent<MeshRenderer>();
+            //禁用阴影投射与接收
+            preMeshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            preMeshRenderer.receiveShadows = false;
+
+            if (config?.preTrueMaterial != null)
+                preMeshRenderer.sharedMaterial = config.preTrueMaterial;
+
+            preObj.SetActive(false);
+        }
+
+        /// <summary>
+        /// 隐藏预览方块
+        /// </summary>
+        private void HidePreView()
+        {
+            if (preObj != null)
+                preObj.SetActive(false);
+
+            currentPreCubeData = null;
+        }
+
+        /// <summary>
+        /// 更新预览方块
+        /// </summary>
+        private void HandlePreview(CubePlacementInfo placement, CubeData cubeData, bool canPlace)
+        {
+            if (cubeData?.CubePrefab == null || config == null)
+            {
+                HidePreView();
+                return;
+            }
+
+            //获取源网格过滤器
+            var srcFilter = cubeData.CubePrefab.GetComponent<MeshFilter>();
+            if (srcFilter == null)
+            {
+                HidePreView();
+                return;
+            }
+
+            preObj.SetActive(true);
+
+            //方块类型变化时更新网格
+            if (currentPreCubeData != cubeData)
+            {
+                currentPreCubeData = cubeData;
+                preMeshFilter.sharedMesh = srcFilter.sharedMesh;
+            }
+
+            //同步位置旋转缩放 pivot在中心所以用WorldCenter
+            preObj.transform.position = placement.WorldCenter;
+            preObj.transform.rotation = Quaternion.identity;
+            preObj.transform.localScale = cubeData.CubePrefab.transform.localScale;
+
+            //按能否放置切换预览材质
+            preMeshRenderer.sharedMaterial = canPlace ? config.preTrueMaterial : config.preFalseMaterial;
+        }
+    }
+}
