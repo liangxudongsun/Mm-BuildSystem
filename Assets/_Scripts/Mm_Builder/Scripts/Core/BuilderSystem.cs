@@ -10,7 +10,7 @@ namespace Mm_Budier
 {
 
     [RequireComponent(typeof(VirtualGrid))]
-    public partial class BuilderSystem : MonoBehaviour, IMmBuilder
+    public partial class BuilderSystem : MonoBehaviour
     {
         [Header("必要组件")]
         [LabelText("虚拟网格组件")] public VirtualGrid virtualGrid;
@@ -107,7 +107,7 @@ namespace Mm_Budier
             }
 
             // 计算放置信息
-            if (!CubePlacementInfo.TryCreate(targetCell, cubeData, virtualGrid, out var placement))
+            if (!CubePlacementInfo.TryCreatePltInfo(targetCell, cubeData, virtualGrid, out var placement))
             {
                 HidePreView();
                 return;
@@ -119,7 +119,7 @@ namespace Mm_Budier
                 // 验证放置信息
                 canPlace = ValidatePlacement(placement);
                 // 更新缓存
-                config.UpdateCache(placement.WorldCenter, targetCell, canPlace);
+                config.UpdateCache(placement.CubeWorldCenter, targetCell, canPlace);
             }
 
             // 处理预览
@@ -155,17 +155,25 @@ namespace Mm_Budier
             if (mainCamera == null)
                 return false;
 
+            // 从屏幕中心发射射线
             var ray = mainCamera.ScreenPointToRay(new Vector3(Screen.width * 0.5f, Screen.height * 0.5f));
             var hits = config.raycastHits;
             var mask = config.groundLayer | config.cubeLayer;
-            int hitCount = Physics.RaycastNonAlloc(
-                ray, hits, config.raycastMaxDistance, mask, QueryTriggerInteraction.Ignore);
+
+            // 射线检测
+            int hitCount = Physics.RaycastNonAlloc(ray,  // 射线
+                                                   hits,  // 碰撞体数组
+                                                   config.raycastMaxDistance,  // 最大距离
+                                                   mask,  // 层掩码
+                                                   QueryTriggerInteraction.Ignore);  // 触发器交互
 
             if (hitCount <= 0)
                 return false;
 
             float closestDist = float.MaxValue;
             bool found = false;
+
+            // 获取最近的碰撞体
             for (int i = 0; i < hitCount; i++)
             {
                 var col = hits[i].collider;
@@ -183,6 +191,11 @@ namespace Mm_Budier
             return found;
         }
 
+        /// <summary>
+        /// 判断是否是玩家碰撞体
+        /// </summary>
+        /// <param name="col">碰撞体</param>
+        /// <returns>是否是玩家碰撞体</returns>
         private bool IsPlayerCollider(Collider col)
         {
             if (playerCollider == null)
@@ -230,8 +243,10 @@ namespace Mm_Budier
         /// </summary>
         private bool ValidatePlacement(CubePlacementInfo placement)
         {
+            // 获取占格列表
             placement.FillOccupiedCells(occupiedList);
 
+            // 遍历占格列表
             foreach (var cell in occupiedList)
             {
                 //验证是否超出边界
@@ -251,10 +266,10 @@ namespace Mm_Budier
             }
 
             //验证是否与玩家碰撞体重叠
-            if (playerCollider != null && playerCollider.bounds.Intersects(placement.WorldBounds))
+            if (playerCollider != null && playerCollider.bounds.Intersects(placement.CubeWorldBounds))
                 return false;
 
-            return CustomVaild();
+            return true;
         }
 
         /// <summary>
@@ -262,15 +277,18 @@ namespace Mm_Budier
         /// </summary>
         private void HandlePlaceCube(CubePlacementInfo placement, CubeData cubeData)
         {
+            // 获取占格列表
             placement.FillOccupiedCells(occupiedList);
+            // 创建方块
             var spawnedObj = TryCreatCube(placement, cubeData);
-            //单位方块不单独存占格列表
-            var occupiedGrids = placement.IsUnit ? null : new List<Vector3Int>(occupiedList);
-            HandleData(placement, cubeData, spawnedObj, occupiedGrids);
+            // 单位方块不单独存占格列表
+            var occupiedGridList = cubeData.IsUnit ? null : new List<Vector3Int>(occupiedList);
+            // 保存数据到缓存
+            HandleDataToCache(placement, cubeData, spawnedObj, occupiedGridList);
         }
 
         /// <summary>
-        /// 实例化方块到世界中心
+        /// 创建方块
         /// </summary>
         private GameObject TryCreatCube(CubePlacementInfo placement, CubeData cubeData)
         {
@@ -283,32 +301,34 @@ namespace Mm_Budier
 
             var spawnedObj = GameObject.Instantiate(
                 prefab,
-                placement.WorldCenter,
+                placement.CubeWorldCenter,
                 Quaternion.identity,
                 cubeRoot);
-            spawnedObj.layer = GetLayerFromMask(config.cubeLayer);
+            spawnedObj.layer = config.cubeLayer;
             return spawnedObj;
         }
 
         /// <summary>
         /// 保存数据到内存
         /// </summary>
-        private void HandleData(CubePlacementInfo placement,
+        private void HandleDataToCache(CubePlacementInfo placement,
                                 CubeData cubeData,
                                 GameObject spawnedObj,
-                                List<Vector3Int> occupiedGrids)
+                                List<Vector3Int> occupiedGridList)
         {
-            var entry = new CubeRuntimeData(cubeData, spawnedObj, occupiedGrids);
-            if (occupiedGrids == null)
+            var runtimeData = new CubeRuntimeData(cubeData, spawnedObj, occupiedGridList);
+            // 如果占格列表为空 则认为是单位方块 直接添加到字典中
+            if (occupiedGridList == null)
             {
-                cubeMgrDict.Add(placement.OriginPoint, entry);
+                cubeMgrDict.Add(placement.OriginPoint, runtimeData);
                 chunkSystem?.AddCube(placement.OriginPoint, cubeData);
                 return;
             }
 
-            foreach (var pos in occupiedGrids)
+            // 如果占格列表不为空 则认为是非单位方块 则遍历占格列表 逐个添加到字典中
+            foreach (var pos in occupiedGridList)
             {
-                cubeMgrDict.Add(pos, entry);
+                cubeMgrDict.Add(pos, runtimeData);
                 chunkSystem?.AddCube(pos, cubeData);
             }
         }
@@ -318,12 +338,12 @@ namespace Mm_Budier
         /// </summary>
         private void BreakCube(Vector3Int gridPos)
         {
-            if (!cubeMgrDict.TryGetValue(gridPos, out var entry)) return;
+            if (!cubeMgrDict.TryGetValue(gridPos, out var data)) return;
 
             //销毁方块物体
-            if (entry.spawnedObj != null) Destroy(entry.spawnedObj);
+            if (data.spawnedObj != null) Destroy(data.spawnedObj);
 
-            if (entry.occupiedGrids == null)
+            if (data.occupiedGrids == null)
             {
                 cubeMgrDict.Remove(gridPos);
                 chunkSystem?.RemoveCube(gridPos);
@@ -331,31 +351,11 @@ namespace Mm_Budier
             }
 
             //删除所有占用网格
-            foreach (var pos in entry.occupiedGrids)
+            foreach (var pos in data.occupiedGrids)
             {
                 if (cubeMgrDict.ContainsKey(pos)) cubeMgrDict.Remove(pos);
                 chunkSystem?.RemoveCube(pos);
             }
-        }
-
-        public bool CustomVaild()
-        {
-            return true;
-        }
-
-        private static int GetLayerFromMask(LayerMask mask)
-        {
-            int value = mask.value;
-            if (value == 0)
-                return 0;
-
-            for (int i = 0; i < 32; i++)
-            {
-                if ((value & (1 << i)) != 0)
-                    return i;
-            }
-
-            return 0;
         }
         #endregion
 

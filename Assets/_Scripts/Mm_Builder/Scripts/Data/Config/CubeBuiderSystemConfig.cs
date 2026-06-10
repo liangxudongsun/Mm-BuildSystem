@@ -13,18 +13,22 @@ namespace Mm_Budier
         {
             get
             {
-                if (instance == null) instance = 
-                    AssetDatabase.LoadAssetAtPath<CubeBuiderSystemConfig>
-                        ("Assets/_Scripts/Mm_Builder/Scripts/Data/So/Config/DefaultConfig.asset");
+                if (instance == null) 
+                instance = AssetDatabase.LoadAssetAtPath<CubeBuiderSystemConfig>(
+                        "Assets/_Scripts/Mm_Builder/Scripts/Data/So/Config/DefaultConfig.asset");
                 return instance;
             }
         }
 
         [Header("射线检测设置")] //此处可替换为其他检测方式 只需要提供相同参数即可
-        [LabelText("射线检测方块层级"), SerializeField] public LayerMask cubeLayer;
-        [LabelText("射线检测最大距离"), SerializeField] public float raycastMaxDistance;
-        [LabelText("地面层级"), SerializeField] public LayerMask groundLayer;
-        [LabelText("最大命中缓存"), SerializeField] public RaycastHit[] raycastHits = new RaycastHit[16];
+        [LabelText("射线检测方块层级"), SerializeField] 
+        public LayerMask cubeLayer;
+        [LabelText("射线检测最大距离"), SerializeField] 
+        public float raycastMaxDistance;
+        [LabelText("地面层级"), SerializeField] 
+        public LayerMask groundLayer;
+        [LabelText("最大命中缓存"), SerializeField] 
+        public RaycastHit[] raycastHits = new RaycastHit[16];
 
 
         [Header("性能优化")]

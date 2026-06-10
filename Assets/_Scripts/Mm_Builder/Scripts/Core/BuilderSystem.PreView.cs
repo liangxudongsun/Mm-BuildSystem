@@ -85,7 +85,7 @@ namespace Mm_Budier
             }
 
             //同步位置旋转缩放 pivot在中心所以用WorldCenter
-            preObj.transform.position = placement.WorldCenter;
+            preObj.transform.position = placement.CubeWorldCenter;
             preObj.transform.rotation = Quaternion.identity;
             preObj.transform.localScale = cubeData.CubePrefab.transform.localScale;
 
