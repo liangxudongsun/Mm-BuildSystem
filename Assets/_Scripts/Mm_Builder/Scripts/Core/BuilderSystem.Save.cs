@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 using UnityEngine;
 
 namespace Mm_Budier
@@ -12,6 +13,7 @@ namespace Mm_Budier
     [System.Serializable]
     public struct CubeSaveEntry
     {
+        [JsonConverter(typeof(StringEnumConverter))]
         public ECubeType type;
         public int x;
         public int y;
@@ -27,21 +29,36 @@ namespace Mm_Budier
 
         public void RegisterAllCubeData()
         {
-            foreach (var cubeData in builderSetting.allCubeDataDict)
+            cubeRegisteredDataDict.Clear();
+            foreach (var cubeData in builderSetting.allCubeDataList)
             {
-                RegisterCubeData(cubeData.Key, cubeData.Value);
+                if (cubeData == null) continue;
+                cubeRegisteredDataDict[cubeData.CubeType] = cubeData;
             }
         }
 
         public void RegisterCubeData(ECubeType cubeType, CubeData cubeData)
         {
-            cubeRegisteredDataDict.Add(cubeData.CubeType, cubeData);
+            cubeRegisteredDataDict[cubeData.CubeType] = cubeData;
         }
 
         public void RemoveCubeData(ECubeType cubeType)
         {
             cubeRegisteredDataDict.Remove(cubeType);
         }
+
+        private string SaveDirectory
+        {
+            get
+            {
+                var folder = string.IsNullOrWhiteSpace(builderSetting.saveFolderName)
+                    ? "BuilderSystemData"
+                    : builderSetting.saveFolderName;
+                return Path.Combine(Application.persistentDataPath, folder);
+            }
+        }
+
+        private string SaveFilePath => Path.Combine(SaveDirectory, "build.json");
 
         /// <summary>
         /// 保存方块数据    
@@ -66,9 +83,10 @@ namespace Mm_Budier
                 });
             }
 
-            string json = JsonConvert.SerializeObject(entries);
-            File.WriteAllText(builderSetting.SavePath, json);
-            Debug.Log($"[Save] 已保存 {entries.Count} 个方块 -> {builderSetting.SavePath}");
+            string json = JsonConvert.SerializeObject(entries,Formatting.Indented);
+            Directory.CreateDirectory(SaveDirectory);
+            File.WriteAllText(SaveFilePath, json);
+            Debug.Log($"[Save] 已保存 {entries.Count} 个方块 -> {SaveFilePath}");
         }
 
         /// <summary>
@@ -76,13 +94,13 @@ namespace Mm_Budier
         /// </summary>
         public void LoadBuildData()
         {
-            if (!File.Exists(builderSetting.SavePath))
+            if (!File.Exists(SaveFilePath))
             {
-                Debug.LogWarning($"[Load] 没有存档文件 {builderSetting.SavePath}");
+                Debug.LogWarning($"[Load] 没有存档文件 {SaveFilePath}");
                 return;
             }
 
-            string json = File.ReadAllText(builderSetting.SavePath);
+            string json = File.ReadAllText(SaveFilePath);
             var entries = JsonConvert.DeserializeObject<List<CubeSaveEntry>>(json);
             if (entries == null) return;
 
@@ -113,7 +131,7 @@ namespace Mm_Budier
                 }
             }
 
-            Debug.Log($"[Load] 已还原 {restored} 个方块 <- {builderSetting.SavePath}");
+            Debug.Log($"[Load] 已还原 {restored} 个方块 <- {SaveFilePath}");
         }
 
         /// <summary>

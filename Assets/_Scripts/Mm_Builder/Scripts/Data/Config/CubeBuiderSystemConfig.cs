@@ -16,7 +16,7 @@ namespace Mm_Budier
             {
                 if (instance == null)
                     instance = AssetDatabase.LoadAssetAtPath<BuilderSystemSetting>(
-                            "Assets/_Scripts/Mm_Builder/Scripts/Data/So/Config/DefaultConfig.asset");
+                            "Assets/_Scripts/Mm_Builder/Scripts/Data/So/Config/BuiderRuntimeSettings.asset");
                 return instance;
             }
         }
@@ -39,21 +39,23 @@ namespace Mm_Budier
         [TitleGroup("预览材质"),LabelText("不可放置预览材质"), SerializeField]
         public Material preFalseMaterial;
 
-        [TitleGroup("数据保存设置"),LabelText("数据保存路径"), SerializeField]
-        public string SavePath = Application.persistentDataPath + "/BuilderSystemData/";
+        [TitleGroup("数据保存设置")]
+        [LabelText("存档子目录名（运行时拼到 persistentDataPath 下）"), SerializeField]
+        public string saveFolderName = "BuilderSystemData";
 
-        [TitleGroup("数据保存设置"),LabelText("所有方块数据字典"), SerializeField]
-        public Dictionary<ECubeType, CubeData> allCubeDataDict = new();
+        [TitleGroup("数据保存设置"), LabelText("所有方块数据"), SerializeField]
+        public List<CubeData> allCubeDataList = new();
 
 #if UNITY_EDITOR
         /// <summary>
-        /// 扫描工程内所有 CubeData 资产 按类型注册进字典 供存读档反查预制体
+        /// 扫描工程内所有 CubeData 资产 写入列表 供存读档反查预制体
         /// </summary>
         [TitleGroup("数据保存设置")]
         [Button("扫描并注册所有方块数据", ButtonSizes.Medium)]
         private void RegisterAllCubeData()
         {
-            allCubeDataDict.Clear();
+            allCubeDataList.Clear();
+            var seenTypes = new HashSet<ECubeType>();
 
             var guids = AssetDatabase.FindAssets("t:CubeData");
             foreach (var guid in guids)
@@ -63,19 +65,18 @@ namespace Mm_Budier
                 if (data == null)
                     continue;
 
-                // 同一类型只保留一个 重复的跳过并提示
-                if (allCubeDataDict.ContainsKey(data.CubeType))
+                if (!seenTypes.Add(data.CubeType))
                 {
                     Debug.LogWarning($"[注册] 方块类型 {data.CubeType} 重复，已跳过：{path}");
                     continue;
                 }
 
-                allCubeDataDict.Add(data.CubeType, data);
+                allCubeDataList.Add(data);
             }
 
             EditorUtility.SetDirty(this);
-            AssetDatabase.SaveAssetIfDirty(this);
-            Debug.Log($"[注册] 完成，共注册 {allCubeDataDict.Count} 种方块");
+            AssetDatabase.SaveAssets();
+            Debug.Log($"[注册] 完成，共注册 {allCubeDataList.Count} 种方块");
         }
 #endif
     }
