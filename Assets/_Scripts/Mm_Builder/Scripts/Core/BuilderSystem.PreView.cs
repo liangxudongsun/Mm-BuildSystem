@@ -51,7 +51,7 @@ namespace Mm_Budier
         /// <summary>
         /// 更新预览方块
         /// </summary>
-        private void HandlePreview(CubePlacementInfo placement, CubeData cubeData, bool canPlace)
+        private void HandlePreview(CubePlacementInfo placement, CubeData cubeData, bool canPlace, int rotationSteps)
         {
             if (cubeData?.CubePrefab == null || builderSetting == null)
             {
@@ -76,9 +76,9 @@ namespace Mm_Budier
                 preMeshFilter.sharedMesh = srcFilter.sharedMesh;
             }
 
-            //同步位置旋转缩放 pivot在中心所以用WorldCenter
-            preObj.transform.position = placement.CubeWorldCenter;
-            preObj.transform.rotation = Quaternion.identity;
+            // 位置按旋转后的实际占格中心对齐，避免绕未旋转中心转导致歪出网格
+            preObj.transform.position = placement.GetWorldCenter(rotationSteps, virtualGrid.gridUnitSize, occupiedList);
+            preObj.transform.rotation = Quaternion.Euler(0f, rotationSteps * 90f, 0f);
             preObj.transform.localScale = cubeData.CubePrefab.transform.localScale;
 
             //按能否放置切换预览材质

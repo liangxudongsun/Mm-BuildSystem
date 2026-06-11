@@ -25,6 +25,9 @@ namespace Mm_Budier
         [LabelText("配置文件")]
         public BuilderSystemSetting builderSetting;
 
+        [Header("输入")]
+        [LabelText("逆时针旋转(90°)")] public Key rotateCounterClockwiseKey = Key.Q;
+        [LabelText("顺时针旋转(90°)")] public Key rotateClockwiseKey = Key.E;
 
         [Header("Debug")]
         [LabelText("当前活跃方块类型")] public CubeData activeCubeData;
@@ -45,6 +48,11 @@ namespace Mm_Budier
         /// 占格校验临时列表
         /// </summary>
         private readonly List<Vector3Int> occupiedList = new(8);
+
+        /// <summary>
+        /// 当前预览/放置的 Y 轴旋转步数（每步 90°）
+        /// </summary>
+        private int placementRotationSteps;
 
 
         /// <summary>
@@ -76,67 +84,85 @@ namespace Mm_Budier
 
         void Update()
         {
-            TryPlaceCube(activeCubeData);
+            HandleBuildInteraction();
         }
 
 
         #region 公共函数
         /// <summary>
-        /// 尝试放置方块
+        /// 设置当前要放置的方块类型
         /// </summary>
-        /// <param name="cubeData">方块数据</param>
         public void TryPlaceCube(CubeData cubeData)
         {
-            //拿到当前方块数据
-            activeCubeData = cubeData;
-            if (cubeData == null)
+            if (activeCubeData != cubeData)
             {
-                HidePreView();
-                return;
+                activeCubeData = cubeData;
+                placementRotationSteps = 0;
             }
+        }
 
-            // 打开 UI 时不检测
+        /// <summary>
+        /// 每帧处理建造交互：拆除 / 旋转 / 预览 / 放置
+        /// </summary>
+        private void HandleBuildInteraction()
+        {
             if (isUIOpen)
             {
                 HidePreView();
                 return;
             }
 
-            // 从射线检测中获取目标格
             if (!TryGetPlacementHit(out var hit))
             {
                 HidePreView();
                 return;
             }
-            var targetCell = GetTargetCell(hit);
 
-            // 计算放置信息
-            if (!CubePlacementInfo.TryCreatePltInfo(targetCell, cubeData, virtualGrid, out var placement))
+            // 右键：拆除准心指向的方块（无需手持物品）
+            if (Mouse.current.rightButton.wasPressedThisFrame)
+            {
+                TryBreakAtHit(hit);
+                return;
+            }
+
+            if (activeCubeData == null)
             {
                 HidePreView();
                 return;
             }
 
-            // 验证放置信息
-            bool canPlace = ValidatePlacement(placement);
+            HandleRotationInput();
 
-            // 处理预览
-            HandlePreview(placement, cubeData, canPlace);
+            var targetCell = GetTargetCell(hit);
+            if (!CubePlacementInfo.TryCreatePltInfo(targetCell, activeCubeData, virtualGrid, out var placement))
+            {
+                HidePreView();
+                return;
+            }
 
-            // 处理输入并放置
-            if (HandleInput(canPlace))
-                HandlePlaceCube(placement, cubeData);
+            bool canPlace = ValidatePlacement(placement, placementRotationSteps);
+            HandlePreview(placement, activeCubeData, canPlace, placementRotationSteps);
+
+            if (canPlace && Mouse.current.leftButton.wasPressedThisFrame)
+                HandlePlaceCube(placement, activeCubeData, placementRotationSteps);
         }
 
         /// <summary>
         /// 破坏方块
         /// </summary>
-        /// <param name="worldPos"></param>
         public void TryBreakCube(Vector3 worldPos)
         {
-            var gridPos = virtualGrid.WorldToGrid(worldPos);
+            var gridPos = virtualGrid.WorldToGrid(worldPos, clampToBounds: false);
             BreakCube(gridPos);
-            activeCubeData = null;
+        }
+
+        private void TryBreakAtHit(RaycastHit hit)
+        {
+            var eps = virtualGrid.gridUnitSize * PLACEMENT_EPSILON;
+            // 向命中面内侧偏移，取到方块占格
+            var insidePoint = hit.point - hit.normal * eps;
+            var gridPos = virtualGrid.WorldToGrid(insidePoint, clampToBounds: false);
+            BreakCube(gridPos);
         }
 
         #endregion
@@ -221,16 +247,19 @@ namespace Mm_Budier
         #endregion
 
         #region 处理输入
-        private bool HandleInput(bool canPlace)
+        private void HandleRotationInput()
         {
-            if (!canPlace) return false;
-            //放置
-            if (Mouse.current.leftButton.wasPressedThisFrame)
-                return true;
-            //销毁
-            if (Mouse.current.rightButton.wasPressedThisFrame)
-                return true;
-            return false;
+            if (WasKeyPressed(rotateCounterClockwiseKey))
+                placementRotationSteps = (placementRotationSteps + 3) % 4;
+            else if (WasKeyPressed(rotateClockwiseKey))
+                placementRotationSteps = (placementRotationSteps + 1) % 4;
+        }
+
+        private static bool WasKeyPressed(Key key)
+        {
+            if (Keyboard.current == null) return false;
+            var control = Keyboard.current[key];
+            return control != null && control.wasPressedThisFrame;
         }
         #endregion
 
@@ -239,10 +268,9 @@ namespace Mm_Budier
         /// <summary>
         /// 校验占格边界 占用 玩家碰撞
         /// </summary>
-        private bool ValidatePlacement(CubePlacementInfo placement)
+        private bool ValidatePlacement(CubePlacementInfo placement, int rotationSteps)
         {
-            // 获取占格列表
-            placement.FillOccupiedCells(occupiedList);
+            placement.FillOccupiedCells(occupiedList, rotationSteps);
 
             // 遍历占格列表
             foreach (var cell in occupiedList)
@@ -256,9 +284,13 @@ namespace Mm_Budier
                     return false;
             }
 
-            //验证是否与玩家碰撞体重叠
-            if (playerCollider != null && playerCollider.bounds.Intersects(placement.CubeWorldBounds))
-                return false;
+            //验证是否与玩家碰撞体重叠（按旋转后的实际占格算包围盒）
+            if (playerCollider != null)
+            {
+                var bounds = placement.GetWorldBounds(rotationSteps, virtualGrid.gridUnitSize, occupiedList);
+                if (playerCollider.bounds.Intersects(bounds))
+                    return false;
+            }
 
             return true;
         }
@@ -269,14 +301,11 @@ namespace Mm_Budier
         /// <param name="placement">放置信息</param>
         /// <param name="cubeData">方块数据</param>
         /// <returns>创建的方块物体</returns>
-        private void HandlePlaceCube(CubePlacementInfo placement, CubeData cubeData)
+        private void HandlePlaceCube(CubePlacementInfo placement, CubeData cubeData, int rotationSteps)
         {
-            // 创建方块
-            var spawnedObj = TryCreatCube(placement, cubeData);
-            // 只记录起始格 占格按尺寸现算
-            var runtimeData = new PlacedCube(cubeData, spawnedObj, placement.OriginPoint);
-            // 保存数据到缓存
-            HandleDataToCache(placement, runtimeData);
+            var spawnedObj = TryCreatCube(placement, cubeData, rotationSteps);
+            var runtimeData = new PlacedCube(cubeData, spawnedObj, placement.OriginPoint, rotationSteps);
+            HandleDataToCache(placement, runtimeData, rotationSteps);
         }
 
         /// <summary>
@@ -285,7 +314,7 @@ namespace Mm_Budier
         /// <param name="placement">放置信息</param>
         /// <param name="cubeData">方块数据</param>
         /// <returns>创建的方块物体</returns>
-        private GameObject TryCreatCube(CubePlacementInfo placement, CubeData cubeData)
+        private GameObject TryCreatCube(CubePlacementInfo placement, CubeData cubeData, int rotationSteps)
         {
             var prefab = cubeData.CubePrefab;
             if (!prefab)
@@ -294,10 +323,12 @@ namespace Mm_Budier
                 return null;
             }
 
+            var rotation = Quaternion.Euler(0f, rotationSteps * 90f, 0f);
+            var worldCenter = placement.GetWorldCenter(rotationSteps, virtualGrid.gridUnitSize, occupiedList);
             var spawnedObj = GameObject.Instantiate(
                 prefab,
-                placement.CubeWorldCenter,
-                Quaternion.identity,
+                worldCenter,
+                rotation,
                 cubeRoot);
             spawnedObj.layer = builderSetting.cubeLayer;
             return spawnedObj;
@@ -308,22 +339,11 @@ namespace Mm_Budier
         /// </summary>
         /// <param name="placement">放置信息</param>
         /// <param name="placedData">已放置方块记录</param>
-        private void HandleDataToCache(CubePlacementInfo placement, PlacedCube placedData)
+        private void HandleDataToCache(CubePlacementInfo placement, PlacedCube placedData, int rotationSteps)
         {
-            var cubeData = placedData.data;
-            // 单位方块只占起始格 直接添加到字典中
-            if (cubeData.IsUnit)
-            {
-                runtimeCubeDataDict.Add(placement.OriginPoint, placedData);
-                return;
-            }
-
-            // 非单位方块 遍历占格 逐个添加到字典中 同一份记录被多个 key 共享
-            placement.FillOccupiedCells(occupiedList);
+            placement.FillOccupiedCells(occupiedList, rotationSteps);
             foreach (var pos in occupiedList)
-            {
                 runtimeCubeDataDict.Add(pos, placedData);
-            }
         }
 
         /// <summary>
@@ -343,9 +363,11 @@ namespace Mm_Budier
                 return;
             }
 
-            // 非单位方块 用起始格 + 尺寸现算出所有占格 逐个移除
-            var placement = new CubePlacementInfo(data.origin, data.data.GetCubePrefabSizeInt(), virtualGrid.gridUnitSize);
-            placement.FillOccupiedCells(occupiedList);
+            CubePlacementInfo.FillOccupiedCells(
+                data.origin,
+                data.data.GetCubePrefabSizeInt(),
+                data.rotationSteps,
+                occupiedList);
             foreach (var pos in occupiedList)
             {
                 if (runtimeCubeDataDict.ContainsKey(pos)) runtimeCubeDataDict.Remove(pos);

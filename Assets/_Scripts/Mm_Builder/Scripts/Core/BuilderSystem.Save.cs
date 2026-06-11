@@ -18,6 +18,7 @@ namespace Mm_Budier
         public int x;
         public int y;
         public int z;
+        public int rotationSteps;
     }
 
     public partial class BuilderSystem
@@ -80,6 +81,7 @@ namespace Mm_Budier
                     x = placedCube.origin.x,
                     y = placedCube.origin.y,
                     z = placedCube.origin.z,
+                    rotationSteps = placedCube.rotationSteps,
                 });
             }
 
@@ -126,7 +128,7 @@ namespace Mm_Budier
                 // 摆放方块到场景
                 if (CubePlacementInfo.TryCreatePltInfo(origin, cubeData, virtualGrid, out var placement))
                 {
-                    HandlePlaceCube(placement, cubeData);
+                    HandlePlaceCube(placement, cubeData, e.rotationSteps);
                     restored++;
                 }
             }

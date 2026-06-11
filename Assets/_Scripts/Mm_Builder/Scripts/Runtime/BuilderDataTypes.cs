@@ -61,13 +61,88 @@ namespace Mm_Budier
         /// <summary>
         /// 写入占用的所有格子
         /// </summary>
-        public void FillOccupiedCells(List<Vector3Int> output)
+        public void FillOccupiedCells(List<Vector3Int> output, int rotationSteps = 0)
+        {
+            FillOccupiedCells(OriginPoint, CubePrefabSize, rotationSteps, output);
+        }
+
+        /// <summary>
+        /// 按 Y 轴旋转步数(每步90°) 写入占用的所有格子
+        /// </summary>
+        public static void FillOccupiedCells(Vector3Int origin, Vector3Int cellSize, int rotationSteps, List<Vector3Int> output)
         {
             output.Clear();
-            for (int x = 0; x < CubePrefabSize.x; x++)
-                for (int y = 0; y < CubePrefabSize.y; y++)
-                    for (int z = 0; z < CubePrefabSize.z; z++)
-                        output.Add(new Vector3Int(OriginPoint.x + x, OriginPoint.y + y, OriginPoint.z + z));
+            rotationSteps = ((rotationSteps % 4) + 4) % 4;
+
+            for (int x = 0; x < cellSize.x; x++)
+                for (int y = 0; y < cellSize.y; y++)
+                    for (int z = 0; z < cellSize.z; z++)
+                        output.Add(origin + RotateOffsetY(new Vector3Int(x, y, z), rotationSteps));
+        }
+
+        private static Vector3Int RotateOffsetY(Vector3Int local, int steps)
+        {
+            var v = local;
+            for (int i = 0; i < steps; i++)
+                v = new Vector3Int(v.z, v.y, -v.x);
+            return v;
+        }
+
+        /// <summary>
+        /// 根据旋转后的实际占格，计算世界空间几何中心
+        /// </summary>
+        public Vector3 GetWorldCenter(int rotationSteps, float gridUnitSize, List<Vector3Int> tempCells)
+        {
+            return GetWorldCenter(OriginPoint, CubePrefabSize, rotationSteps, gridUnitSize, tempCells);
+        }
+
+        public static Vector3 GetWorldCenter(
+            Vector3Int origin,
+            Vector3Int cellSize,
+            int rotationSteps,
+            float gridUnitSize,
+            List<Vector3Int> tempCells)
+        {
+            GetWorldBounds(origin, cellSize, rotationSteps, gridUnitSize, tempCells, out var center, out _);
+            return center;
+        }
+
+        /// <summary>
+        /// 根据旋转后的实际占格，计算世界空间 AABB
+        /// </summary>
+        public Bounds GetWorldBounds(int rotationSteps, float gridUnitSize, List<Vector3Int> tempCells)
+        {
+            GetWorldBounds(OriginPoint, CubePrefabSize, rotationSteps, gridUnitSize, tempCells, out var center, out var size);
+            return new Bounds(center, size);
+        }
+
+        public static void GetWorldBounds(
+            Vector3Int origin,
+            Vector3Int cellSize,
+            int rotationSteps,
+            float gridUnitSize,
+            List<Vector3Int> tempCells,
+            out Vector3 center,
+            out Vector3 size)
+        {
+            FillOccupiedCells(origin, cellSize, rotationSteps, tempCells);
+
+            int minX = int.MaxValue, minY = int.MaxValue, minZ = int.MaxValue;
+            int maxX = int.MinValue, maxY = int.MinValue, maxZ = int.MinValue;
+            foreach (var cell in tempCells)
+            {
+                if (cell.x < minX) minX = cell.x;
+                if (cell.y < minY) minY = cell.y;
+                if (cell.z < minZ) minZ = cell.z;
+                if (cell.x > maxX) maxX = cell.x;
+                if (cell.y > maxY) maxY = cell.y;
+                if (cell.z > maxZ) maxZ = cell.z;
+            }
+
+            var minWorld = new Vector3(minX, minY, minZ) * gridUnitSize;
+            var maxWorld = new Vector3(maxX + 1, maxY + 1, maxZ + 1) * gridUnitSize;
+            center = (minWorld + maxWorld) * 0.5f;
+            size = maxWorld - minWorld;
         }
     }
 
@@ -81,12 +156,15 @@ namespace Mm_Budier
         public CubeData data;
         public GameObject spawnedObj;
         public Vector3Int origin;
+        /// <summary> Y 轴旋转步数，每步 90° </summary>
+        public int rotationSteps;
 
-        public PlacedCube(CubeData data, GameObject spawnedObj, Vector3Int origin)
+        public PlacedCube(CubeData data, GameObject spawnedObj, Vector3Int origin, int rotationSteps = 0)
         {
             this.data = data;
             this.spawnedObj = spawnedObj;
             this.origin = origin;
+            this.rotationSteps = rotationSteps;
         }
     }
 
