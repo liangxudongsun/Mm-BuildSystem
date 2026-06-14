@@ -99,7 +99,7 @@ namespace Mm_Budier
                     x = placedCube.origin.x,
                     y = placedCube.origin.y,
                     z = placedCube.origin.z,
-                    rotationSteps = placedCube.rotationSteps,
+                    rotationSteps = (int)placedCube.rotation,
                 });
             }
 
@@ -144,9 +144,10 @@ namespace Mm_Budier
                 }
 
                 // 摆放方块到场景
-                if (CubePlacementInfo.TryCreatePltInfo(origin, cubeData, virtualGrid, out var placement))
+                if (CubePlacementInfo.TryCreate(origin, cubeData, out var placement))
                 {
-                    HandlePlaceCube(placement, cubeData, e.rotationSteps);
+                    var rotation = (CubeRotation)(e.rotationSteps & 1);
+                    HandlePlaceCube(placement, cubeData, rotation);
                     restored++;
                 }
             }

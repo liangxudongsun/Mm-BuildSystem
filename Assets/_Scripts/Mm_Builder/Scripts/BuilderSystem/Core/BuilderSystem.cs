@@ -14,6 +14,7 @@ namespace Mm_Budier
     {
         [Header("必要组件")]
         [LabelText("虚拟网格组件")] public BuilderVirtualGrid virtualGrid;
+        [LabelText("开发者组件")] public IMmBuilder imBuilder;
 
         [LabelText("相机组件")] public Camera mainCamera;//做第一人称的话用这个
         [LabelText("玩家碰撞体组件")] public Collider playerCollider;
@@ -50,13 +51,13 @@ namespace Mm_Budier
         private readonly List<Vector3Int> occupiedList = new(8);
 
         /// <summary>
-        /// 当前预览/放置的 Y 轴旋转步数（每步 90°）
+        /// 当前预览/放置的 Y 轴旋转
         /// </summary>
-        private int placementRotationSteps;
+        private CubeRotation placementRotation;
 
 
         /// <summary>
-        /// 单例
+        /// 单例 
         /// </summary>
         private static BuilderSystem instance;
         public static BuilderSystem Instance { get => instance; private set => instance = value; }
@@ -75,11 +76,13 @@ namespace Mm_Budier
 
             virtualGrid ??= GetComponent<BuilderVirtualGrid>();
             mainCamera ??= Camera.main;
+
+            imBuilder ??= GetComponent<IMmBuilder>();
         }
 
         void Start()
         {
-            InitPreView();
+            InitPreViewCubeInfo();
         }
 
         void Update()
@@ -97,7 +100,7 @@ namespace Mm_Budier
             if (activeCubeData != cubeData)
             {
                 activeCubeData = cubeData;
-                placementRotationSteps = 0;
+                placementRotation = CubeRotation.Deg0;
             }
         }
 
@@ -134,17 +137,17 @@ namespace Mm_Budier
             HandleRotationInput();
 
             var targetCell = GetTargetCell(hit);
-            if (!CubePlacementInfo.TryCreatePltInfo(targetCell, activeCubeData, virtualGrid, out var placement))
+            if (!CubePlacementInfo.TryCreate(targetCell, activeCubeData, out var placement))
             {
                 HidePreView();
                 return;
             }
 
-            bool canPlace = ValidatePlacement(placement, placementRotationSteps);
-            HandlePreview(placement, activeCubeData, canPlace, placementRotationSteps);
+            bool canPlace = ValidatePlacement(placement, placementRotation);
+            HandlePreview(placement, activeCubeData, canPlace, placementRotation);
 
             if (canPlace && Mouse.current.leftButton.wasPressedThisFrame)
-                HandlePlaceCube(placement, activeCubeData, placementRotationSteps);
+                HandlePlaceCube(placement, activeCubeData, placementRotation);
         }
 
         /// <summary>
@@ -249,10 +252,10 @@ namespace Mm_Budier
         #region 处理输入
         private void HandleRotationInput()
         {
-            if (WasKeyPressed(rotateCounterClockwiseKey))
-                placementRotationSteps = (placementRotationSteps + 3) % 4;
-            else if (WasKeyPressed(rotateClockwiseKey))
-                placementRotationSteps = (placementRotationSteps + 1) % 4;
+            if (!WasKeyPressed(rotateCounterClockwiseKey) && !WasKeyPressed(rotateClockwiseKey))
+                return;
+
+            placementRotation = placementRotation == CubeRotation.Deg0 ? CubeRotation.Deg90 : CubeRotation.Deg0;
         }
 
         private static bool WasKeyPressed(Key key)
@@ -268,26 +271,22 @@ namespace Mm_Budier
         /// <summary>
         /// 校验占格边界 占用 玩家碰撞
         /// </summary>
-        private bool ValidatePlacement(CubePlacementInfo placement, int rotationSteps)
+        private bool ValidatePlacement(CubePlacementInfo placement, CubeRotation rotation)
         {
-            placement.FillOccupiedCells(occupiedList, rotationSteps);
+            placement.FillOccupiedCells(occupiedList, rotation);
 
-            // 遍历占格列表
             foreach (var cell in occupiedList)
             {
-                //验证是否超出边界
                 if (!virtualGrid.ValidPlacementCell(cell))
                     return false;
 
-                //验证是否已有方块
                 if (runtimeCubeDataDict.ContainsKey(cell))
                     return false;
             }
 
-            //验证是否与玩家碰撞体重叠（按旋转后的实际占格算包围盒）
             if (playerCollider != null)
             {
-                var bounds = placement.GetWorldBounds(rotationSteps, virtualGrid.gridUnitSize, occupiedList);
+                var bounds = CubePlacementInfo.ComputeBoundsFromCells(occupiedList, virtualGrid.gridUnitSize);
                 if (playerCollider.bounds.Intersects(bounds))
                     return false;
             }
@@ -296,55 +295,30 @@ namespace Mm_Budier
         }
 
         /// <summary>
-        /// 放置方块
+        /// 放置方块并写入运行时字典
         /// </summary>
-        /// <param name="placement">放置信息</param>
-        /// <param name="cubeData">方块数据</param>
-        /// <returns>创建的方块物体</returns>
-        private void HandlePlaceCube(CubePlacementInfo placement, CubeData cubeData, int rotationSteps)
+        private void HandlePlaceCube(CubePlacementInfo placement, CubeData cubeData, CubeRotation rotation)
         {
-            var spawnedObj = TryCreatCube(placement, cubeData, rotationSteps);
-            var runtimeData = new PlacedCube(cubeData, spawnedObj, placement.OriginPoint, rotationSteps);
-            spawnedObj.GetComponent<CubeBehaviour>()?.OnPlaced(runtimeData);
-            HandleDataToCache(placement, runtimeData, rotationSteps);
-        }
+            placement.FillOccupiedCells(occupiedList, rotation);
 
-        /// <summary>
-        /// 创建方块
-        /// </summary>
-        /// <param name="placement">放置信息</param>
-        /// <param name="cubeData">方块数据</param>
-        /// <returns>创建的方块物体</returns>
-        private GameObject TryCreatCube(CubePlacementInfo placement, CubeData cubeData, int rotationSteps)
-        {
             var prefab = cubeData.CubePrefab;
             if (!prefab)
             {
                 print("得不到预制体" + cubeData.CubePrefab);
-                return null;
+                return;
             }
 
-            var rotation = Quaternion.Euler(0f, rotationSteps * 90f, 0f);
-            var worldCenter = placement.GetWorldCenter(rotationSteps, virtualGrid.gridUnitSize, occupiedList);
-            var spawnedObj = GameObject.Instantiate(
-                prefab,
-                worldCenter,
-                rotation,
-                cubeRoot);
+            var unitSize = virtualGrid.gridUnitSize;
+            var worldCenter = CubePlacementInfo.ComputeBoundsFromCells(occupiedList, unitSize).center;
+            var yaw = rotation == CubeRotation.Deg90 ? 90f : 0f;
+            var spawnedObj = Instantiate(prefab, worldCenter, Quaternion.Euler(0f, yaw, 0f), cubeRoot);
             spawnedObj.layer = builderSetting.cubeLayer;
-            return spawnedObj;
-        }
 
-        /// <summary>
-        /// 保存数据到内存
-        /// </summary>
-        /// <param name="placement">放置信息</param>
-        /// <param name="placedData">已放置方块记录</param>
-        private void HandleDataToCache(CubePlacementInfo placement, PlacedCube placedData, int rotationSteps)
-        {
-            placement.FillOccupiedCells(occupiedList, rotationSteps);
+            var runtimeData = new PlacedCube(cubeData, spawnedObj, placement.OriginPoint, rotation);
+            spawnedObj.GetComponent<CubeBehaviour>()?.OnPlaced(runtimeData);
+
             foreach (var pos in occupiedList)
-                runtimeCubeDataDict.Add(pos, placedData);
+                runtimeCubeDataDict.Add(pos, runtimeData);
         }
 
         /// <summary>
@@ -371,7 +345,7 @@ namespace Mm_Budier
             CubePlacementInfo.FillOccupiedCells(
                 data.origin,
                 data.data.GetCubePrefabSizeInt(),
-                data.rotationSteps,
+                data.rotation,
                 occupiedList);
             foreach (var pos in occupiedList)
             {

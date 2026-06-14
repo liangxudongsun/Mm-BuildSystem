@@ -2,6 +2,7 @@ namespace  Mm_Budier
 {
     public interface IMmBuilder
     {
-         public bool CustomVaild();
+        bool CustomVaild();
+        void CustomInput();
     }
 }

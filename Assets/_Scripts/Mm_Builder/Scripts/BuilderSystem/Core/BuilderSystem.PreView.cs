@@ -17,9 +17,9 @@ namespace Mm_Budier
         private CubeData currentPreCubeData;
         
         /// <summary>
-        /// 初始化预览方块
+        /// 初始化预览方块信息
         /// </summary>
-        private void InitPreView()
+        private void InitPreViewCubeInfo()
         {
             //创建预览方块
             preObj = new GameObject("PreViewObj");
@@ -51,7 +51,7 @@ namespace Mm_Budier
         /// <summary>
         /// 更新预览方块
         /// </summary>
-        private void HandlePreview(CubePlacementInfo placement, CubeData cubeData, bool canPlace, int rotationSteps)
+        private void HandlePreview(CubePlacementInfo placement, CubeData cubeData, bool canPlace, CubeRotation rotation)
         {
             if (cubeData?.CubePrefab == null || builderSetting == null)
             {
@@ -77,8 +77,8 @@ namespace Mm_Budier
             }
 
             // 位置按旋转后的实际占格中心对齐，避免绕未旋转中心转导致歪出网格
-            preObj.transform.position = placement.GetWorldCenter(rotationSteps, virtualGrid.gridUnitSize, occupiedList);
-            preObj.transform.rotation = Quaternion.Euler(0f, rotationSteps * 90f, 0f);
+            preObj.transform.position = CubePlacementInfo.ComputeBoundsFromCells(occupiedList, virtualGrid.gridUnitSize).center;
+            preObj.transform.rotation = Quaternion.Euler(0f, rotation == CubeRotation.Deg90 ? 90f : 0f, 0f);
             preObj.transform.localScale = cubeData.CubePrefab.transform.localScale;
 
             //按能否放置切换预览材质
