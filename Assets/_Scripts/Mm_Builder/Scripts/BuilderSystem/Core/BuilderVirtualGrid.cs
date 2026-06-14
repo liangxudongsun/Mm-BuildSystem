@@ -16,7 +16,7 @@ public class BuilderVirtualGrid : MonoBehaviour
     [LabelText("启用分区")]
     public bool useGridGroups;
     [LabelText("网格组列表"), ShowIf("useGridGroups")]
-    public List<VirtualGridGroup> gridGroups = new();
+    public List<BuilderVirtualGridGroup> gridGroups = new();
 
     [Header("可视化配置")]
     [LabelText("显示虚拟网格高度")]

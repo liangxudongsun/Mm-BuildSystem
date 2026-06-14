@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using Sirenix.OdinInspector;
 using UnityEditor;
 using UnityEngine;
@@ -45,11 +46,46 @@ namespace Mm_Budier
         public Material preFalseMaterial;
 
         [TitleGroup("数据保存设置")]
-        [LabelText("存档子目录名（运行时拼到 persistentDataPath 下）"), SerializeField]
+        [LabelText("存档子目录名"), SerializeField]
         public string saveFolderName = "BuilderSystemData";
+
+        [TitleGroup("数据保存设置")]
+        [LabelText("方块存档文件名"), SerializeField]
+        public string buildFileName = "build.json";
+
+        [TitleGroup("数据保存设置")]
+        [LabelText("分区配置文件名"), SerializeField]
+        public string gridGroupsFileName = "grid-groups.json";
 
         [TitleGroup("数据保存设置"), LabelText("所有方块数据"), SerializeField]
         public List<CubeData> allCubeDataList = new();
+
+        /// <summary>
+        /// persistentDataPath 下的存档根目录
+        /// </summary>
+        public string GetSaveDirectory()
+        {
+            var folder = string.IsNullOrWhiteSpace(saveFolderName) ? "BuilderSystemData" : saveFolderName;
+            return Path.Combine(Application.persistentDataPath, folder);
+        }
+
+        /// <summary>
+        /// 方块摆放 JSON 完整路径
+        /// </summary>
+        public string GetBuildFilePath()
+        {
+            var fileName = string.IsNullOrWhiteSpace(buildFileName) ? "build.json" : buildFileName;
+            return Path.Combine(GetSaveDirectory(), fileName);
+        }
+
+        /// <summary>
+        /// 分区 grid-groups JSON 完整路径
+        /// </summary>
+        public string GetGridGroupsFilePath()
+        {
+            var fileName = string.IsNullOrWhiteSpace(gridGroupsFileName) ? "grid-groups.json" : gridGroupsFileName;
+            return Path.Combine(GetSaveDirectory(), fileName);
+        }
 
 #if UNITY_EDITOR
         /// <summary>

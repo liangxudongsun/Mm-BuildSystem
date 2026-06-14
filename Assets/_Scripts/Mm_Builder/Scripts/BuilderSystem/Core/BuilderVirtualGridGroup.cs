@@ -7,22 +7,21 @@ using UnityEditor;
 #endif
 
 /// <summary>
-/// 可放置分区：用「原点格 + 尺寸格」描述一个轴对齐长方体区域。
-/// 格坐标边界为左闭右开 [origin, origin + size)，与 ValidBoundary / Contains 一致。
+/// 可放置分区 原点格加尺寸格描述轴对齐长方体
+/// 格坐标左闭右开 origin 到 origin加size
 /// </summary>
 [Serializable]
-public class VirtualGridGroup
+public class BuilderVirtualGridGroup
 {
     [LabelText("编号")] public string id;
     [LabelText("允许放置")] public bool allowPlacement = true;
-
-    /// <summary>分区最小角格坐标（含）。XZ 由 Scene 两点取格决定，Y 通常表示楼层/高度层。</summary>
     [LabelText("原点(格)")] public Vector3Int originCell;
-
-    /// <summary>各轴占用格数，至少为 1。max = origin + size（不含）。</summary>
     [LabelText("尺寸(格)"), MinValue(1)] public Vector3Int sizeCells = Vector3Int.one;
 
-    /// <summary>左闭右开边界，供 Contains 与 Gizmo 共用。</summary>
+    /// <summary>
+    /// 算出分区格坐标边界 min含 max不含
+    /// Contains 与 DrawGizmo 共用
+    /// </summary>
     public void GetGridBounds(out int minX, out int maxX, out int minY, out int maxY, out int minZ, out int maxZ)
     {
         minX = originCell.x;
@@ -33,6 +32,10 @@ public class VirtualGridGroup
         maxZ = originCell.z + Mathf.Max(1, sizeCells.z);
     }
 
+    /// <summary>
+    /// 格坐标是否落在此分区内
+    /// 运行时 ValidPlacementCell 用来判断能不能放
+    /// </summary>
     public bool Contains(Vector3Int gridPos)
     {
         GetGridBounds(out int minX, out int maxX, out int minY, out int maxY, out int minZ, out int maxZ);
@@ -41,9 +44,13 @@ public class VirtualGridGroup
             && gridPos.z >= minZ && gridPos.z < maxZ;
     }
 
-    public VirtualGridGroup Clone()
+    /// <summary>
+    /// 深拷贝一份分区数据
+    /// Editor 读写 grid-groups.json 时避免改到场景里那份引用
+    /// </summary>
+    public BuilderVirtualGridGroup Clone()
     {
-        return new VirtualGridGroup
+        return new BuilderVirtualGridGroup
         {
             id = id,
             allowPlacement = allowPlacement,
@@ -55,6 +62,10 @@ public class VirtualGridGroup
         };
     }
 
+    /// <summary>
+    /// Scene 视图绘制此分区线框
+    /// 由 BuilderVirtualGrid.OnDrawGizmos 调用
+    /// </summary>
     public void DrawGizmo(
         int gridUnitSize,
         bool showGridColor,
@@ -79,10 +90,14 @@ public class VirtualGridGroup
 }
 
 /// <summary>
-/// 分区/全局网格 Gizmo 线框（Editor Scene 视图）
+/// 分区与全局网格的 Scene Gizmo 绘制
+/// 仅 Editor 可视化 不参与运行时逻辑
 /// </summary>
 public static class GridGizmoDraw
 {
+    /// <summary>
+    /// 按格边界画线框 底面或立体框 竖线 高度文字
+    /// </summary>
     public static void DrawRegionBounds(
         int minX, int maxX, int minY, int maxY, int minZ, int maxZ,
         float unitSize, float planeYOffset,
@@ -101,7 +116,6 @@ public static class GridGizmoDraw
             Gizmos.color = gridColor;
             if (showGridHeight)
             {
-                // 立体线框：覆盖 origin.y 到 origin.y + size.y 整段高度
                 var center = new Vector3(
                     (minX + maxX) * 0.5f * unitSize,
                     (minY + maxY) * 0.5f * unitSize,
@@ -114,14 +128,12 @@ public static class GridGizmoDraw
             }
             else
             {
-                // 仅画底面矩形，Y 取 originCell.y 对应的世界高度
                 DrawFloorRect(minX, maxX, minZ, maxZ, minY * unitSize + planeYOffset, unitSize);
             }
         }
 
         if (showGridHeight && showYAxisColor)
         {
-            // 四角竖线，标出分区在 Y 方向的跨度
             Gizmos.color = yAxisColor;
             DrawCornerPillars(minX, maxX, minY, maxY, minZ, maxZ, unitSize);
         }
@@ -135,9 +147,12 @@ public static class GridGizmoDraw
     }
 
 #if UNITY_EDITOR
-    private static GUIStyle heightLabelStyle;
+    static GUIStyle heightLabelStyle;
 
-    private static void DrawHeightLabel(
+    /// <summary>
+    /// 分区右上角显示层数或编号
+    /// </summary>
+    static void DrawHeightLabel(
         int minX, int maxX, int minY, int maxY, int minZ, int maxZ,
         float unitSize, int heightInCells,
         Color color, int fontSize, string regionLabel)
@@ -159,7 +174,11 @@ public static class GridGizmoDraw
     }
 #endif
 
-    private static void DrawFloorRect(int minX, int maxX, int minZ, int maxZ, float worldY, float unitSize)
+    /// <summary>
+    /// 只画分区底面矩形轮廓
+    /// showGridHeight 关闭时用 避免立体框挡视线
+    /// </summary>
+    static void DrawFloorRect(int minX, int maxX, int minZ, int maxZ, float worldY, float unitSize)
     {
         float x0 = minX * unitSize;
         float x1 = maxX * unitSize;
@@ -172,7 +191,10 @@ public static class GridGizmoDraw
         Gizmos.DrawLine(new Vector3(x0, worldY, z1), new Vector3(x0, worldY, z0));
     }
 
-    private static void DrawCornerPillars(
+    /// <summary>
+    /// 分区四角竖线 标出 Y 方向高度跨度
+    /// </summary>
+    static void DrawCornerPillars(
         int minX, int maxX, int minY, int maxY, int minZ, int maxZ, float unitSize)
     {
         float y0 = minY * unitSize;

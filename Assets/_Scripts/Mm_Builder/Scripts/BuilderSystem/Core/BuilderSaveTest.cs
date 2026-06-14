@@ -29,10 +29,7 @@ namespace Mm_Budier
                 if (setting == null)
                     return "(未绑定 BuilderSystemSetting)";
 
-                var folder = string.IsNullOrWhiteSpace(setting.saveFolderName)
-                    ? "BuilderSystemData"
-                    : setting.saveFolderName;
-                return Path.Combine(Application.persistentDataPath, folder, "build.json");
+                return setting.GetBuildFilePath();
             }
         }
 

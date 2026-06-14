@@ -8,7 +8,7 @@ namespace Mm_Budier.Editor
     /// </summary>
     internal static class VirtualGridGroupEditorUtility
     {
-        public static void SetFromTwoCells(VirtualGridGroup group, Vector3Int cellA, Vector3Int cellB)
+        public static void SetFromTwoCells(BuilderVirtualGridGroup group, Vector3Int cellA, Vector3Int cellB)
         {
             if (group == null)
                 return;

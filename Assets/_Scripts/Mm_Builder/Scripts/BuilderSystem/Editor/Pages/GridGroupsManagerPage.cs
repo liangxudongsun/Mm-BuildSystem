@@ -26,7 +26,7 @@ namespace Mm_Budier.Editor
         [TitleGroup("分区配置")]
         [ShowInInspector, LabelText("网格组列表")]
         [ListDrawerSettings(ShowIndexLabels = true, DraggableItems = true)]
-        private List<VirtualGridGroup> groups = new();
+        private List<BuilderVirtualGridGroup> groups = new();
 
         [TitleGroup("操作")]
         [HorizontalGroup("操作/Row1")]

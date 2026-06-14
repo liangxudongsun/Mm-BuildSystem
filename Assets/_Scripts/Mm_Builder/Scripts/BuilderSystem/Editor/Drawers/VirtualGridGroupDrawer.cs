@@ -5,7 +5,7 @@ using UnityEditor;
 using UnityEngine;
 
 /// <summary>Inspector 中为每个 VirtualGridGroup 提供 Scene 两点取格入口。</summary>
-public class VirtualGridGroupDrawer : OdinValueDrawer<VirtualGridGroup>
+public class VirtualGridGroupDrawer : OdinValueDrawer<BuilderVirtualGridGroup>
 {
     protected override void DrawPropertyLayout(GUIContent label)
     {

@@ -6,34 +6,6 @@ using UnityEngine;
 
 namespace Mm_Budier
 {
-    /// <summary>方块存档与分区 JSON 的路径约定（persistentDataPath 下）。</summary>
-    public static class BuilderSavePaths
-    {
-        public const string DefaultFolderName = "BuilderSystemData";
-        public const string BuildFileName = "build.json";
-        public const string GridGroupsFileName = "grid-groups.json";
-
-        public static string ResolveFolderName(string saveFolderName)
-        {
-            return string.IsNullOrWhiteSpace(saveFolderName) ? DefaultFolderName : saveFolderName;
-        }
-
-        public static string GetSaveDirectory(string saveFolderName)
-        {
-            return Path.Combine(Application.persistentDataPath, ResolveFolderName(saveFolderName));
-        }
-
-        public static string GetBuildFilePath(string saveFolderName)
-        {
-            return Path.Combine(GetSaveDirectory(saveFolderName), BuildFileName);
-        }
-
-        public static string GetGridGroupsFilePath(string saveFolderName)
-        {
-            return Path.Combine(GetSaveDirectory(saveFolderName), GridGroupsFileName);
-        }
-    }
-
     /// <summary>
     /// 存档结构体 
     /// </summary>
@@ -75,9 +47,9 @@ namespace Mm_Budier
             cubeRegisteredDataDict.Remove(cubeType);
         }
 
-        private string SaveDirectory => BuilderSavePaths.GetSaveDirectory(builderSetting.saveFolderName);
+        private string SaveDirectory => builderSetting.GetSaveDirectory();
 
-        private string SaveFilePath => BuilderSavePaths.GetBuildFilePath(builderSetting.saveFolderName);
+        private string SaveFilePath => builderSetting.GetBuildFilePath();
 
         /// <summary>
         /// 保存方块数据    

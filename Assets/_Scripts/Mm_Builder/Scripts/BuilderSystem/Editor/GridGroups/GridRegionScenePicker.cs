@@ -9,7 +9,7 @@ namespace Mm_Budier.Editor
     /// </summary>
     internal static class GridRegionScenePicker
     {
-        private static VirtualGridGroup targetGroup;
+        private static BuilderVirtualGridGroup targetGroup;
         private static int gridUnitSize = 1;
         private static int pickStep;
         private static Vector3Int firstCell;
@@ -18,7 +18,7 @@ namespace Mm_Budier.Editor
 
         public static bool IsActive => targetGroup != null;
 
-        public static void Begin(VirtualGridGroup group, int unitSize)
+        public static void Begin(BuilderVirtualGridGroup group, int unitSize)
         {
             if (group == null)
                 return;
