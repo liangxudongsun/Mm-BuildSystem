@@ -18,12 +18,20 @@ namespace  Mm_Budier
         /// </summary>
         bool CustomBreakValid(out Vector3Int gridPos,CubeData cubeData);
         
-
         /// <summary>
         /// 自定义射线检测校验
         /// </summary>
         bool CustomRaycastValid(out RaycastHit hit);
 
+        /// <summary>
+        /// 自定义放置成功回调
+        /// </summary>
+        void CustorOnPlaceSucceeded(CubeInstance cubeInstance);
+
+        /// <summary>
+        /// 自定义破坏成功回调
+        /// </summary>
+        void CustorOnBreakSucceeded(CubeInstance cubeInstance);
 
     }
 }

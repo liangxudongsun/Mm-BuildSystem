@@ -129,14 +129,13 @@ namespace Mm_Budier
             tempOccupiedGridList = new List<Vector3Int>(maxOccupied);
 
             builderSetting.RegisterAllCubeData();
-
         }
 
         /// <summary>
         /// 设置外部开发者组件
         /// </summary>
         /// <param name="builderCustom">外部开发者组件</param>
-        public void SetImBuilder(IBuilderCustom builderCustom) => this.imBuilder = builderCustom;
+        public void OpenCustomMode(IBuilderCustom builderCustom) => this.imBuilder = builderCustom;
 
 
         /// <summary>
