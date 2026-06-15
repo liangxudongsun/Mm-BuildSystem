@@ -20,17 +20,12 @@ namespace Mm_Budier.Editor
         [FoldoutGroup("输出设置")]
         [HorizontalGroup("输出设置/EnumFolder")]
         [LabelText("枚举输出目录"), LabelWidth(110)]
-        [ShowInInspector]
+        [ShowInInspector, Delayed]
+        [Tooltip("可粘贴文件夹或 .cs 文件路径 回车自动解析并保存")]
         private string EnumOutputFolder
         {
             get => settings?.EnumOutputFolder ?? string.Empty;
-            set
-            {
-                if (settings == null)
-                    return;
-                settings.EnumOutputFolder = EditorSettingsUtility.NormalizeAssetsPath(value);
-                EditorSettingsUtility.MarkDirty(settings);
-            }
+            set => CommitEnumOutputFolder(value);
         }
 
         [FoldoutGroup("输出设置")]
@@ -61,17 +56,12 @@ namespace Mm_Budier.Editor
         [FoldoutGroup("输出设置")]
         [HorizontalGroup("输出设置/CubeFolder")]
         [LabelText("CubeData 输出目录"), LabelWidth(110)]
-        [ShowInInspector]
+        [ShowInInspector, Delayed]
+        [Tooltip("可粘贴文件夹或 .asset 所在路径 回车自动解析并保存")]
         private string CubeDataOutputFolder
         {
             get => settings?.CubeDataOutputFolder ?? string.Empty;
-            set
-            {
-                if (settings == null)
-                    return;
-                settings.CubeDataOutputFolder = EditorSettingsUtility.NormalizeAssetsPath(value);
-                EditorSettingsUtility.MarkDirty(settings);
-            }
+            set => CommitCubeDataOutputFolder(value);
         }
 
         [FoldoutGroup("输出设置")]
@@ -111,8 +101,40 @@ namespace Mm_Budier.Editor
 
         private bool ShowEnumFolderWarning => settings != null && !EditorSettingsUtility.IsValidAssetsFolder(settings.EnumOutputFolder);
         private bool ShowCubeFolderWarning => settings != null && !EditorSettingsUtility.IsValidAssetsFolder(settings.CubeDataOutputFolder);
-        private string EnumFolderWarning => $"枚举输出目录无效：{settings?.EnumOutputFolder}\n请点击「浏览」重新选择 Assets 内的文件夹。";
-        private string CubeFolderWarning => $"CubeData 输出目录无效：{settings?.CubeDataOutputFolder}\n请点击「浏览」重新选择 Assets 内的文件夹。";
+        private string EnumFolderWarning => $"枚举输出目录无效：{settings?.EnumOutputFolder}\n请粘贴 Assets 内路径后按回车，或点击「浏览」选择文件夹。";
+        private string CubeFolderWarning => $"CubeData 输出目录无效：{settings?.CubeDataOutputFolder}\n请粘贴 Assets 内路径后按回车，或点击「浏览」选择文件夹。";
+
+        /// <summary>
+        /// 回车确认枚举输出路径 支持粘贴 .cs 文件自动拆目录与文件名
+        /// </summary>
+        private void CommitEnumOutputFolder(string rawInput)
+        {
+            if (settings == null)
+                return;
+
+            if (EditorSettingsUtility.TryResolveEnumOutputInput(rawInput, out var folder, out var fileName))
+            {
+                settings.EnumOutputFolder = folder;
+                if (!string.IsNullOrEmpty(fileName))
+                    settings.EnumFileName = fileName;
+            }
+            else
+                settings.EnumOutputFolder = EditorSettingsUtility.ResolveAssetsFolderPath(rawInput);
+
+            EditorSettingsUtility.Save(settings);
+        }
+
+        /// <summary>
+        /// 回车确认 CubeData 输出路径
+        /// </summary>
+        private void CommitCubeDataOutputFolder(string rawInput)
+        {
+            if (settings == null)
+                return;
+
+            settings.CubeDataOutputFolder = EditorSettingsUtility.ResolveAssetsFolderPath(rawInput);
+            EditorSettingsUtility.Save(settings);
+        }
 
         private void PickFolder(System.Action<string> apply, string title, string current)
         {

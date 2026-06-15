@@ -59,6 +59,61 @@ namespace Mm_Budier.Editor
         }
 
         /// <summary>
+        /// 把输入路径解析为 Assets 内文件夹 粘贴文件路径时取所在目录
+        /// </summary>
+        public static string ResolveAssetsFolderPath(string path)
+        {
+            var normalized = NormalizeAssetsPath(path);
+            if (string.IsNullOrWhiteSpace(normalized))
+                return string.Empty;
+
+            if (AssetDatabase.IsValidFolder(normalized))
+                return normalized;
+
+            if (Path.HasExtension(normalized))
+            {
+                var parent = Path.GetDirectoryName(normalized)?.Replace('\\', '/');
+                if (!string.IsNullOrEmpty(parent) && parent.StartsWith("Assets/"))
+                    normalized = parent;
+            }
+
+            if (!AssetDatabase.IsValidFolder(normalized))
+            {
+                var asset = AssetDatabase.LoadAssetAtPath<Object>(normalized);
+                if (asset != null)
+                {
+                    var assetPath = AssetDatabase.GetAssetPath(asset);
+                    normalized = Path.GetDirectoryName(assetPath)?.Replace('\\', '/');
+                }
+            }
+
+            return string.IsNullOrEmpty(normalized) ? string.Empty : normalized;
+        }
+
+        /// <summary>
+        /// 解析枚举输出输入 粘贴到 .cs 文件时拆分目录与文件名
+        /// </summary>
+        public static bool TryResolveEnumOutputInput(string input, out string folder, out string fileName)
+        {
+            folder = string.Empty;
+            fileName = null;
+
+            var normalized = NormalizeAssetsPath(input);
+            if (string.IsNullOrWhiteSpace(normalized))
+                return false;
+
+            if (normalized.EndsWith(".cs", System.StringComparison.OrdinalIgnoreCase))
+            {
+                fileName = Path.GetFileName(normalized);
+                folder = Path.GetDirectoryName(normalized)?.Replace('\\', '/');
+                return !string.IsNullOrEmpty(folder);
+            }
+
+            folder = ResolveAssetsFolderPath(normalized);
+            return !string.IsNullOrEmpty(folder);
+        }
+
+        /// <summary>
         /// 打开系统文件夹选择器，返回 Assets 相对路径；取消则返回 null。
         /// </summary>
         public static string PickAssetsFolder(string title, string currentFolder)

@@ -21,11 +21,37 @@ MonoBehaviour:
     PrefabModificationsReferencedUnityObjects: []
     PrefabModifications: []
     SerializationNodes: []
-  Entries: []
-  CustomGroups: []
-  EnumNamePresets: []
-  EnumOutputFolder: Assets/_Scripts/Mm_Builder/Scripts/Data
+  Entries:
+  - Name: "A\u65B9\u5757"
+    Value: 0
+    Comment: 
+    Group: "\u57FA\u7840\u65B9\u5757"
+    CreateCubeData: 1
+    CubeAssetName: "A\u65B9\u5757"
+    CubePrefab: {fileID: 8331364260158678125, guid: 11d2335d42383ed4293fd219e39812d8, type: 3}
+  - Name: "B\u65B9\u5757"
+    Value: 1
+    Comment: 
+    Group: "\u53EF\u4EA4\u4E92\u65B9\u5757"
+    CreateCubeData: 1
+    CubeAssetName: "\u6CE5\u65B9\u5757"
+    CubePrefab: {fileID: 8331364260158678125, guid: 11d2335d42383ed4293fd219e39812d8, type: 3}
+  - Name: "C\u65B9\u5757"
+    Value: 2
+    Comment: 
+    Group: "\u57FA\u7840\u65B9\u5757"
+    CreateCubeData: 1
+    CubeAssetName: "112\u65B9\u5757"
+    CubePrefab: {fileID: 8331364260158678125, guid: 0b635434e54d48c4798a99c609ef4571, type: 3}
+  CustomGroups:
+  - "\u57FA\u7840\u65B9\u5757"
+  - "\u53EF\u4EA4\u4E92\u65B9\u5757"
+  EnumNamePresets:
+  - "A\u65B9\u5757"
+  - "B\u65B9\u5757"
+  - "C\u65B9\u5757"
+  EnumOutputFolder: Assets/_Scripts/Mm_Builder/Scripts/BuilderSystem/Scripts/Data
   EnumFileName: ECubeType.cs
-  CubeDataOutputFolder: Assets/_Scripts/Mm_Builder/Scripts/Data/So/CubeConfig
+  CubeDataOutputFolder: Assets/_Scripts/Mm_Builder/Scripts/BuilderSystem/So/CubeConfig
   Namespace: Mm_Budier
   EnumClassName: ECubeType
