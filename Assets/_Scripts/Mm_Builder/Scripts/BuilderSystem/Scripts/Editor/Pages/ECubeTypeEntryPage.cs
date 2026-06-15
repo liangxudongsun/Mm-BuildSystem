@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Sirenix.OdinInspector;
+using Sirenix.Utilities.Editor;
 using UnityEditor;
 using UnityEngine;
 
@@ -80,9 +81,31 @@ namespace Mm_Budier.Editor
             set { if (Entry != null) Entry.CubePrefab = value; }
         }
 
-        [Button("删除此条目", ButtonSizes.Medium)]
-        [GUIColor(1f, 0.45f, 0.45f)]
-        private void RemoveEntry()
+        [ShowInInspector]
+        [PropertyOrder(90)]
+        [BoxGroup("预制体编辑", false)]
+        [ShowIf(nameof(HasEntryPrefab))]
+        [LabelText("材质")]
+        [AssetsOnly]
+        [OnValueChanged(nameof(ApplyMaterialEdit))]
+        private Material PrefabMaterial;
+
+        [ShowInInspector]
+        [PropertyOrder(90)]
+        [BoxGroup("预制体编辑")]
+        [ShowIf(nameof(HasEntryPrefab))]
+        [LabelText("缩放")]
+        [OnValueChanged(nameof(ApplyScaleEdit))]
+        private Vector3 PrefabLocalScale = Vector3.one;
+
+        private string cachedPrefabPath;
+        private bool isRefreshingPrefabCache;
+        private bool HasEntryPrefab => Entry?.CubePrefab != null;
+
+        /// <summary>
+        /// 删除当前枚举条目
+        /// </summary>
+        public void RemoveEntry()
         {
             if (Entry == null || Settings == null)
                 return;
@@ -103,6 +126,14 @@ namespace Mm_Budier.Editor
             }
 
             OnMenuStructureChanged?.Invoke(next);
+        }
+
+        [PropertyOrder(100)]
+        [OnInspectorGUI]
+        private void DrawPrefabPreview()
+        {
+            SyncPrefabEditCacheIfNeeded();
+            CubePrefabPreviewUtility.Draw(Entry?.CubePrefab);
         }
 
         private IEnumerable<ValueDropdownItem<string>> GetNameDropdown()
@@ -143,8 +174,77 @@ namespace Mm_Budier.Editor
         private void OnPrefabChanged()
         {
             MarkDirty();
+            RefreshPrefabEditCache();
             if (ECubeTypeCodeGenerator.TrySyncEntryCubeData(Settings, Entry))
                 AssetDatabase.SaveAssets();
+            CubePrefabPreviewUtility.Invalidate();
+            GUIHelper.RequestRepaint();
+        }
+
+        private void SyncPrefabEditCacheIfNeeded()
+        {
+            var prefab = Entry?.CubePrefab;
+            var path = prefab != null ? AssetDatabase.GetAssetPath(prefab) : string.Empty;
+            if (path == cachedPrefabPath)
+                return;
+
+            RefreshPrefabEditCache();
+        }
+
+        private void RefreshPrefabEditCache()
+        {
+            isRefreshingPrefabCache = true;
+            try
+            {
+                var prefab = Entry?.CubePrefab;
+                cachedPrefabPath = prefab != null ? AssetDatabase.GetAssetPath(prefab) : string.Empty;
+
+                if (prefab == null || !CubePrefabEditUtility.TryReadSnapshot(prefab, out var snapshot))
+                {
+                    PrefabMaterial = null;
+                    PrefabLocalScale = Vector3.one;
+                    return;
+                }
+
+                PrefabMaterial = snapshot.SharedMaterial;
+                PrefabLocalScale = snapshot.LocalScale;
+            }
+            finally
+            {
+                isRefreshingPrefabCache = false;
+            }
+        }
+
+        private void ApplyScaleEdit()
+        {
+            if (isRefreshingPrefabCache)
+                return;
+
+            var prefab = Entry?.CubePrefab;
+            if (prefab == null)
+                return;
+
+            if (!CubePrefabEditUtility.TryApplyLocalScale(prefab, PrefabLocalScale))
+                return;
+
+            CubePrefabPreviewUtility.Invalidate();
+            GUIHelper.RequestRepaint();
+        }
+
+        private void ApplyMaterialEdit()
+        {
+            if (isRefreshingPrefabCache)
+                return;
+
+            var prefab = Entry?.CubePrefab;
+            if (prefab == null)
+                return;
+
+            if (!CubePrefabEditUtility.TryApplyMaterial(prefab, PrefabMaterial))
+                return;
+
+            CubePrefabPreviewUtility.Invalidate();
+            GUIHelper.RequestRepaint();
         }
 
         private string GetTitle() => string.IsNullOrWhiteSpace(Entry?.Name) ? "未命名条目" : Entry.Name;

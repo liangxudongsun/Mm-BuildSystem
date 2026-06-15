@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe3217bd0f032e64d970f786cd454238, type: 3}
-  m_Name: Wood
+  m_Name: "\u72D7\u5C4E\u65B9\u5757"
   m_EditorClassIdentifier: Assembly-CSharp::Mm_Budier.CubeData
   serializationData:
     SerializedFormat: 2
@@ -22,4 +22,4 @@ MonoBehaviour:
     PrefabModifications: []
     SerializationNodes: []
   CubeType: 3
-  CubePrefab: {fileID: 0}
+  CubePrefab: {fileID: 8331364260158678125, guid: 0b635434e54d48c4798a99c609ef4571, type: 3}

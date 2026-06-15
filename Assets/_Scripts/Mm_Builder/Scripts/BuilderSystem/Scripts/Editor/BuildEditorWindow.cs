@@ -70,11 +70,24 @@ namespace Mm_Budier.Editor
                 GUILayout.Label(selected.Name, SirenixGUIStyles.BoldLabel);
                 GUILayout.FlexibleSpace();
 
-                if (SirenixEditorGUI.ToolbarButton("导入"))
-                    enumManagerPage.ImportFromEnumFile();
+                // 仅枚举管理器根页显示批量导入/生成
+                if (selected.Value is EnumManagerPage)
+                {
+                    if (SirenixEditorGUI.ToolbarButton("导入"))
+                        enumManagerPage.ImportFromEnumFile();
 
-                if (SirenixEditorGUI.ToolbarButton("生成"))
-                    enumManagerPage.GenerateAll();
+                    if (SirenixEditorGUI.ToolbarButton("生成"))
+                        enumManagerPage.GenerateAll();
+                }
+
+                if (selected.Value is ECubeTypeEntryPage entryPage)
+                {
+                    var prevColor = GUI.backgroundColor;
+                    GUI.backgroundColor = new Color(1f, 0.45f, 0.45f);
+                    if (SirenixEditorGUI.ToolbarButton("删除此条目"))
+                        entryPage.RemoveEntry();
+                    GUI.backgroundColor = prevColor;
+                }
             }
             SirenixEditorGUI.EndHorizontalToolbar();
         }
