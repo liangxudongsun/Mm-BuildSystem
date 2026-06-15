@@ -7,8 +7,8 @@ namespace Mm_Budier
 {
     public interface ICubeBehaviour
     {
-        void OnPlaced(PlacedCube placedCube);
+        void OnPlaced(CubeInstance cubeInstance);
         void OnRemoved();
-        void OnInteract(PlacedCube placedCube);
+        void OnInteract(CubeInstance cubeInstance);
     }
 }

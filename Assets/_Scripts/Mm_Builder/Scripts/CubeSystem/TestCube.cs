@@ -9,21 +9,21 @@ namespace Mm_Budier
 {
     public class TestCube : CubeBehaviour
     {
-        public override void OnPlaced(PlacedCube placedCube)
+        public override void OnPlaced(CubeInstance cubeInstance)
         {
-            base.OnPlaced(placedCube);
-            Debug.Log("OnPlaced: " + placedCube.data.CubeType);
+            base.OnPlaced(cubeInstance);
+            Debug.Log("OnPlaced: " + cubeInstance.data.CubeType);
         }
         public override void OnRemoved()
         {   
             base.OnRemoved();
-            Debug.Log("OnRemoved: " + this.curCubeData.data.CubeType);
-            this.curCubeData = null;
+            Debug.Log("OnRemoved: " + this.curCubeInstance.data.CubeType);
+            this.curCubeInstance = null;
         }
-        public override void OnInteract(PlacedCube placedCube)
+        public override void OnInteract(CubeInstance cubeInstance)
         {
-            base.OnInteract(placedCube);
-            Debug.Log("OnInteract: " + placedCube.data.CubeType);
+            base.OnInteract(cubeInstance);
+            Debug.Log("OnInteract: " + cubeInstance.data.CubeType);
         }
     }
 }

@@ -6,11 +6,13 @@ using UnityEngine;
 
 namespace Mm_Budier.Editor
 {
-    /// <summary>Mm Builder → 分区管理：编辑分区列表，与场景组件及 grid-groups.json 同步。</summary>
+    /// <summary>
+    /// Mm Builder 分区管理 编辑分区列表 与场景组件及 grid-groups.json 同步
+    /// </summary>
     public class GridGroupsManagerPage
     {
         [TitleGroup("场景目标")]
-        [InfoBox("编辑「原点 + 尺寸(格)」，或点分区上的「Scene 两点取格」在 Scene 连点两角。JSON 与方块存档同目录。")]
+        [InfoBox("编辑分区后记得「应用到场景」或「保存到文件」。JSON 与方块存档同目录。", InfoMessageType.None)]
         [ShowInInspector, LabelText("虚拟网格组件")]
         [OnValueChanged(nameof(OnTargetChanged))]
         private BuilderVirtualGrid targetGrid;
@@ -20,12 +22,12 @@ namespace Mm_Budier.Editor
         private string ConfigFilePath => GridGroupsConfigIO.GetFilePath();
 
         [TitleGroup("分区配置")]
-        [ShowInInspector, LabelText("启用分区")]
-        private bool useGridGroups;
-
-        [TitleGroup("分区配置")]
+        [InfoBox("列表项底部「两点取格」在 Scene 连点两角设 XZ 高度用尺寸 Y Esc 取消", InfoMessageType.None)]
         [ShowInInspector, LabelText("网格组列表")]
-        [ListDrawerSettings(ShowIndexLabels = true, DraggableItems = true)]
+        [ListDrawerSettings(
+            DraggableItems = true,
+            ShowIndexLabels = false,
+            ListElementLabelName = "id")]
         private List<BuilderVirtualGridGroup> groups = new();
 
         [TitleGroup("操作")]
@@ -37,7 +39,7 @@ namespace Mm_Budier.Editor
                 return;
 
             SyncGridUnitSize();
-            (useGridGroups, groups) = GridGroupsConfigIO.Capture(targetGrid);
+            groups = GridGroupsConfigIO.Capture(targetGrid);
             Debug.Log($"[GridGroups] 已从场景读取 {groups.Count} 个分区");
         }
 
@@ -49,7 +51,7 @@ namespace Mm_Budier.Editor
                 return;
 
             Undo.RecordObject(targetGrid, "Apply Grid Groups");
-            GridGroupsConfigIO.Apply(targetGrid, useGridGroups, groups);
+            GridGroupsConfigIO.Apply(targetGrid, groups);
             EditorUtility.SetDirty(targetGrid);
             Debug.Log($"[GridGroups] 已应用到场景 {targetGrid.name}（{groups.Count} 个分区）");
         }
@@ -58,7 +60,7 @@ namespace Mm_Budier.Editor
         [Button("保存到文件", ButtonSizes.Medium)]
         private void SaveToFile()
         {
-            if (!GridGroupsConfigIO.TrySave(useGridGroups, groups, out var error))
+            if (!GridGroupsConfigIO.TrySave(groups, out var error))
             {
                 Debug.LogError($"[GridGroups] 保存失败：{error}");
                 return;
@@ -71,7 +73,7 @@ namespace Mm_Budier.Editor
         [Button("从文件加载", ButtonSizes.Medium)]
         private void LoadFromFile()
         {
-            if (!GridGroupsConfigIO.TryLoad(out useGridGroups, out groups, out var error))
+            if (!GridGroupsConfigIO.TryLoad(out groups, out var error))
             {
                 Debug.LogWarning($"[GridGroups] 加载失败：{error}");
                 EditorUtility.DisplayDialog("分区配置", error, "确定");

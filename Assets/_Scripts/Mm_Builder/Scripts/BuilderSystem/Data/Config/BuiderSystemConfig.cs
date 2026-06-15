@@ -35,8 +35,11 @@ namespace Mm_Budier
         public float raycastMaxDistance;
         [TitleGroup("射线检测设置"),LabelText("地面层级"), SerializeField]
         public LayerMask groundLayer;
-        [TitleGroup("射线检测设置"),LabelText("最大命中缓存"), SerializeField]
-        public RaycastHit[] raycastHits = new RaycastHit[16];
+        [TitleGroup("射线检测设置"), LabelText("最大命中缓存数量"), MinValue(1), SerializeField]
+        public int maxRaycastHitCount = 16;
+
+        [TitleGroup("占格缓存"), LabelText("占格列表最大容量"), MinValue(1), SerializeField]
+        public int maxOccupiedGridCount = 8;
 
 
         [Header("预览材质")]
@@ -93,7 +96,7 @@ namespace Mm_Budier
         /// </summary>
         [TitleGroup("数据保存设置")]
         [Button("扫描并注册所有方块数据", ButtonSizes.Medium)]
-        private void RegisterAllCubeData()
+        public void RegisterAllCubeData()
         {
             allCubeDataList.Clear();
             var seenTypes = new HashSet<ECubeType>();

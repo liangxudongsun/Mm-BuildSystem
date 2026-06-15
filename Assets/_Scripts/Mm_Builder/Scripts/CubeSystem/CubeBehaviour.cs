@@ -3,12 +3,12 @@ using UnityEngine;
 
 public abstract class CubeBehaviour : MonoBehaviour, ICubeBehaviour
 {
-    protected PlacedCube curCubeData;
-    public virtual void OnPlaced(PlacedCube placedCube){
-        this.curCubeData = placedCube;
+    protected CubeInstance curCubeInstance;
+    public virtual void OnPlaced(CubeInstance cubeInstance){
+        this.curCubeInstance = cubeInstance;
     }
     public virtual void OnRemoved(){
     }  
-    public virtual void OnUpdated(PlacedCube placedCube){}
-    public virtual void OnInteract(PlacedCube placedCube){}
+    public virtual void OnUpdated(CubeInstance cubeInstance){}
+    public virtual void OnInteract(CubeInstance cubeInstance){}
 }

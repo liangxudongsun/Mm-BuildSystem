@@ -9,14 +9,13 @@ using UnityEngine.SceneManagement;
 namespace Mm_Budier.Editor
 {
     /// <summary>
-    /// 分区 grid-groups.json 读写，以及场景 BuilderVirtualGrid 与页签数据之间的拷贝。
+    /// 分区 grid-groups.json 读写 以及场景 BuilderVirtualGrid 与页签数据之间的拷贝
     /// </summary>
     internal static class GridGroupsConfigIO
     {
         [Serializable]
         private class GridGroupsFile
         {
-            public bool useGridGroups;
             public List<BuilderVirtualGridGroup> groups = new();
         }
 
@@ -28,27 +27,26 @@ namespace Mm_Budier.Editor
                 : Path.Combine(Application.persistentDataPath, "BuilderSystemData", "grid-groups.json");
         }
 
-        public static (bool useGridGroups, List<BuilderVirtualGridGroup> groups) Capture(BuilderVirtualGrid grid)
+        public static List<BuilderVirtualGridGroup> Capture(BuilderVirtualGrid grid)
         {
             var groups = new List<BuilderVirtualGridGroup>();
-            if (grid?.gridGroups != null)
+            if (grid?.gridGroups == null)
+                return groups;
+
+            foreach (var group in grid.gridGroups)
             {
-                foreach (var group in grid.gridGroups)
-                {
-                    if (group != null)
-                        groups.Add(group.Clone());
-                }
+                if (group != null)
+                    groups.Add(group.Clone());
             }
 
-            return (grid != null && grid.useGridGroups, groups);
+            return groups;
         }
 
-        public static void Apply(BuilderVirtualGrid grid, bool useGridGroups, List<BuilderVirtualGridGroup> groups)
+        public static void Apply(BuilderVirtualGrid grid, List<BuilderVirtualGridGroup> groups)
         {
             if (grid == null)
                 return;
 
-            grid.useGridGroups = useGridGroups;
             grid.gridGroups ??= new List<BuilderVirtualGridGroup>();
             grid.gridGroups.Clear();
 
@@ -78,9 +76,8 @@ namespace Mm_Budier.Editor
             return null;
         }
 
-        public static bool TryLoad(out bool useGridGroups, out List<BuilderVirtualGridGroup> groups, out string error)
+        public static bool TryLoad(out List<BuilderVirtualGridGroup> groups, out string error)
         {
-            useGridGroups = false;
             groups = new List<BuilderVirtualGridGroup>();
             error = null;
             var path = GetFilePath();
@@ -100,7 +97,6 @@ namespace Mm_Budier.Editor
                     return false;
                 }
 
-                useGridGroups = file.useGridGroups;
                 groups = file.groups ?? new List<BuilderVirtualGridGroup>();
                 return true;
             }
@@ -111,7 +107,7 @@ namespace Mm_Budier.Editor
             }
         }
 
-        public static bool TrySave(bool useGridGroups, List<BuilderVirtualGridGroup> groups, out string error)
+        public static bool TrySave(List<BuilderVirtualGridGroup> groups, out string error)
         {
             error = null;
             var path = GetFilePath();
@@ -123,7 +119,6 @@ namespace Mm_Budier.Editor
 
                 var file = new GridGroupsFile
                 {
-                    useGridGroups = useGridGroups,
                     groups = groups ?? new List<BuilderVirtualGridGroup>(),
                 };
                 File.WriteAllText(path, JsonConvert.SerializeObject(file, Formatting.Indented));

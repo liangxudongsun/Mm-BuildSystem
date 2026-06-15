@@ -49,9 +49,18 @@ namespace Mm_Budier
         }
 
         /// <summary>
+        /// 显示预览方块
+        /// </summary>
+        private void ShowPreView()
+        {
+            if (preObj != null)
+                preObj.SetActive(true);
+        }
+
+        /// <summary>
         /// 更新预览方块
         /// </summary>
-        private void HandlePreview(CubePlacementInfo placement, CubeData cubeData, bool canPlace, CubeRotation rotation)
+        public override void HandlePreview(BuilderPlacementReport placement, CubeData cubeData, bool canPlace)
         {
             if (cubeData?.CubePrefab == null || builderSetting == null)
             {
@@ -67,7 +76,9 @@ namespace Mm_Budier
                 return;
             }
 
-            preObj.SetActive(true);
+            ShowPreView();
+
+            placement.FillOccupiedInfoToList(tempOccupiedGridList);
 
             //方块类型变化时更新网格
             if (currentPreCubeData != cubeData)
@@ -77,11 +88,12 @@ namespace Mm_Budier
             }
 
             // 位置按旋转后的实际占格中心对齐，避免绕未旋转中心转导致歪出网格
-            preObj.transform.position = CubePlacementInfo.ComputeBoundsFromCells(occupiedList, virtualGrid.gridUnitSize).center;
-            preObj.transform.rotation = Quaternion.Euler(0f, rotation == CubeRotation.Deg90 ? 90f : 0f, 0f);
+            preObj.transform.position = placement.GetWorldCenterFormGridList(tempOccupiedGridList, virtualGrid.gridUnitSize);
+                                                            
+            preObj.transform.rotation = placement.CubeWorldRotation;
             preObj.transform.localScale = cubeData.CubePrefab.transform.localScale;
 
-            //按能否放置切换预览材质
+            // 按能否放置切换预览材质
             preMeshRenderer.sharedMaterial = canPlace ? builderSetting.preTrueMaterial : builderSetting.preFalseMaterial;
         }
     }

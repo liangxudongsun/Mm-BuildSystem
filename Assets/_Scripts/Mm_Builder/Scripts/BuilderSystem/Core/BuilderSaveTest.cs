@@ -40,14 +40,14 @@ namespace Mm_Budier
         {
             if (!EnsurePlaying()) return;
             System.RegisterAllCubeData();
-            System.SaveBuildData();
+            System.HandleSave();
         }
 
         [Button("加载", ButtonSizes.Large), GUIColor(0.55f, 0.75f, 1f)]
         private void TestLoad()
         {
             if (!EnsurePlaying()) return;
-            System.LoadBuildData();
+            System.HandleLoad();
         }
 
         [Button("注册方块反查表", ButtonSizes.Medium)]

@@ -1,6 +1,8 @@
+using Newtonsoft.Json;
 using Sirenix.OdinInspector;
 using UnityEngine;
 using System;
+using UnityEngine.Serialization;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -11,38 +13,64 @@ using UnityEditor;
 /// 格坐标左闭右开 origin 到 origin加size
 /// </summary>
 [Serializable]
+[LabelWidth(72)]
 public class BuilderVirtualGridGroup
 {
-    [LabelText("编号")] public string id;
-    [LabelText("允许放置")] public bool allowPlacement = true;
-    [LabelText("原点(格)")] public Vector3Int originCell;
-    [LabelText("尺寸(格)"), MinValue(1)] public Vector3Int sizeCells = Vector3Int.one;
+    [LabelText("编号")]
+    public string id;
+
+    [LabelText("允许放置")]
+    public bool allowPlacement = true;
+
+    [LabelText("起点")]
+    [FormerlySerializedAs("originCell")]
+    [JsonProperty("originCell")]
+    public Vector3Int originGridPos;
+
+    [LabelText("尺寸"), MinValue(1)]
+    [FormerlySerializedAs("sizeCells")]
+    [JsonProperty("sizeCells")]
+    public Vector3Int gridSize = Vector3Int.one;
+
 
     /// <summary>
-    /// 算出分区格坐标边界 min含 max不含
-    /// Contains 与 DrawGizmo 共用
+    /// 判断传入网格坐标是否落在此分区内
     /// </summary>
-    public void GetGridBounds(out int minX, out int maxX, out int minY, out int maxY, out int minZ, out int maxZ)
+    public bool IsInside(Vector3Int gridPos)
     {
-        minX = originCell.x;
-        maxX = originCell.x + Mathf.Max(1, sizeCells.x);
-        minY = originCell.y;
-        maxY = originCell.y + Mathf.Max(1, sizeCells.y);
-        minZ = originCell.z;
-        maxZ = originCell.z + Mathf.Max(1, sizeCells.z);
+        // 获取分区的坐标边界
+        GetGridBounds(out int groupMinX,
+                      out int groupMaxX,
+                      out int groupMinY,
+                      out int groupMaxY,
+                      out int groupMinZ,
+                      out int groupMaxZ);
+
+        // 判断网格坐标是否落在分区内
+        return gridPos.x >= groupMinX && gridPos.x < groupMaxX
+            && gridPos.y >= groupMinY && gridPos.y < groupMaxY
+            && gridPos.z >= groupMinZ && gridPos.z < groupMaxZ;
     }
 
+
     /// <summary>
-    /// 格坐标是否落在此分区内
-    /// 运行时 ValidPlacementCell 用来判断能不能放
+    /// 算出分区的坐标边界
     /// </summary>
-    public bool Contains(Vector3Int gridPos)
+    public void GetGridBounds(out int minX,
+                              out int maxX,
+                              out int minY,
+                              out int maxY,
+                              out int minZ,
+                              out int maxZ)
     {
-        GetGridBounds(out int minX, out int maxX, out int minY, out int maxY, out int minZ, out int maxZ);
-        return gridPos.x >= minX && gridPos.x < maxX
-            && gridPos.y >= minY && gridPos.y < maxY
-            && gridPos.z >= minZ && gridPos.z < maxZ;
+        minX = originGridPos.x;
+        maxX = originGridPos.x + Mathf.Max(1, gridSize.x);
+        minY = originGridPos.y;
+        maxY = originGridPos.y + Mathf.Max(1, gridSize.y);
+        minZ = originGridPos.z;
+        maxZ = originGridPos.z + Mathf.Max(1, gridSize.z);
     }
+
 
     /// <summary>
     /// 深拷贝一份分区数据
@@ -54,11 +82,11 @@ public class BuilderVirtualGridGroup
         {
             id = id,
             allowPlacement = allowPlacement,
-            originCell = originCell,
-            sizeCells = new Vector3Int(
-                Mathf.Max(1, sizeCells.x),
-                Mathf.Max(1, sizeCells.y),
-                Mathf.Max(1, sizeCells.z)),
+            originGridPos = originGridPos,
+            gridSize = new Vector3Int(
+                Mathf.Max(1, gridSize.x),
+                Mathf.Max(1, gridSize.y),
+                Mathf.Max(1, gridSize.z)),
         };
     }
 
@@ -70,7 +98,6 @@ public class BuilderVirtualGridGroup
         int gridUnitSize,
         bool showGridColor,
         bool showGridHeight,
-        bool showYAxisColor,
         Color gridColor,
         Color yAxisColor,
         float planeYOffset,
@@ -81,9 +108,9 @@ public class BuilderVirtualGridGroup
         GridGizmoDraw.DrawRegionBounds(
             minX, maxX, minY, maxY, minZ, maxZ,
             gridUnitSize, planeYOffset,
-            showGridColor, showGridHeight, showYAxisColor,
+            showGridColor, showGridHeight,
             gridColor, yAxisColor,
-            showGridHeight ? sizeCells.y : 0,
+            showGridHeight ? gridSize.y : 0,
             heightLabelColor, heightLabelFontSize,
             id);
     }
@@ -101,9 +128,9 @@ public static class GridGizmoDraw
     public static void DrawRegionBounds(
         int minX, int maxX, int minY, int maxY, int minZ, int maxZ,
         float unitSize, float planeYOffset,
-        bool showGridColor, bool showGridHeight, bool showYAxisColor,
+        bool showGridColor, bool showGridHeight,
         Color gridColor, Color yAxisColor,
-        int heightInCells,
+        int heightInGrids,
         Color heightLabelColor,
         int heightLabelFontSize,
         string regionLabel = null)
@@ -132,17 +159,17 @@ public static class GridGizmoDraw
             }
         }
 
-        if (showGridHeight && showYAxisColor)
+        if (showGridHeight)
         {
             Gizmos.color = yAxisColor;
             DrawCornerPillars(minX, maxX, minY, maxY, minZ, maxZ, unitSize);
         }
 
-        if (showGridHeight && heightInCells > 0)
+        if (showGridHeight && heightInGrids > 0)
         {
             DrawHeightLabel(
                 minX, maxX, minY, maxY, minZ, maxZ, unitSize,
-                heightInCells, heightLabelColor, heightLabelFontSize, regionLabel);
+                heightInGrids, heightLabelColor, heightLabelFontSize, regionLabel);
         }
     }
 
@@ -154,7 +181,7 @@ public static class GridGizmoDraw
     /// </summary>
     static void DrawHeightLabel(
         int minX, int maxX, int minY, int maxY, int minZ, int maxZ,
-        float unitSize, int heightInCells,
+        float unitSize, int heightInGrids,
         Color color, int fontSize, string regionLabel)
     {
         var labelPos = new Vector3(
@@ -167,8 +194,8 @@ public static class GridGizmoDraw
         heightLabelStyle.normal.textColor = color;
 
         var text = string.IsNullOrWhiteSpace(regionLabel)
-            ? heightInCells.ToString()
-            : $"{regionLabel}\n{heightInCells}";
+            ? heightInGrids.ToString()
+            : $"{regionLabel}\n{heightInGrids}";
 
         Handles.Label(labelPos, text, heightLabelStyle);
     }
