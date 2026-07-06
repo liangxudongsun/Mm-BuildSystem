@@ -38,6 +38,4 @@ MonoBehaviour:
   allCubeDataList:
   - {fileID: 11400000, guid: 4cb50d255cb69d7449a8887746fd0bc5, type: 2}
   - {fileID: 11400000, guid: 6eff24bd1067464478b4a53f853a6723, type: 2}
-  - {fileID: 11400000, guid: 46b51e75f7739e54d9aa873e493ef831, type: 2}
-  - {fileID: 11400000, guid: 6692385c8f78a3c4a86fc4fabde13b9d, type: 2}
-  - {fileID: 11400000, guid: a167a3f9b73430f49a122d1a6dc8db1d, type: 2}
+  - {fileID: 11400000, guid: 5d96190dfc5927a44ae6fb394c550f3b, type: 2}
