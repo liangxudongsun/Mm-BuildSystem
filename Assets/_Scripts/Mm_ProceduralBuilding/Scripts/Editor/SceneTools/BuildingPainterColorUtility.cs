@@ -20,6 +20,8 @@ namespace Mm_ProceduralBuilding.Editor
                     return new Color(1f, 0.75f, 0.1f, 1f);
                 case EPaintedBuildingCellType.Erase:
                     return new Color(0.85f, 0.85f, 0.85f, 1f);
+                case EPaintedBuildingCellType.Room:
+                    return new Color(0.45f, 0.35f, 0.9f, 1f);
                 default:
                     return new Color(1f, 1f, 1f, 0.5f);
             }

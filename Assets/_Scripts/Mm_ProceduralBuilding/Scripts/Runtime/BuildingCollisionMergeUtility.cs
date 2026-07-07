@@ -31,7 +31,8 @@ namespace Mm_ProceduralBuilding
                 if (floorData == null)
                     continue;
 
-                int baseY = convention.GetFloorBaseY(floorData.floorIndex);
+                int baseY = paintedPlan.GetFloorBaseY(floorData.floorIndex);
+                int globalWallHeightGridCount = paintedPlan.GlobalWallHeightGridCount;
                 var floorCollisionRoot = BuildingPrimitiveFactory.CreateGroup(
                     $"Floor_{floorData.floorIndex}",
                     collisionRoot);
@@ -45,7 +46,7 @@ namespace Mm_ProceduralBuilding
                 colliderCount += CreateMergedBoxes(
                     structureLayerRoot,
                     convention,
-                    BuildStructureVoxelHashList(floorData, baseY));
+                    BuildStructureVoxelHashList(floorData, baseY, globalWallHeightGridCount));
             }
 
             return colliderCount;
@@ -124,7 +125,10 @@ namespace Mm_ProceduralBuilding
         /// <summary>
         /// 构建结构体素集合
         /// </summary>
-        private static HashSet<Vector3Int> BuildStructureVoxelHashList(PaintedBuildingFloorData floorData, int baseY)
+        private static HashSet<Vector3Int> BuildStructureVoxelHashList(
+            PaintedBuildingFloorData floorData,
+            int baseY,
+            int globalWallHeightGridCount)
         {
             var voxelHashList = new HashSet<Vector3Int>();
             foreach (var cellData in floorData.structureCellDataList)
@@ -139,10 +143,10 @@ namespace Mm_ProceduralBuilding
                             voxelHashList,
                             cellData.gridPos,
                             baseY + 1,
-                            Mathf.Max(1, cellData.heightGridCount));
+                            globalWallHeightGridCount);
                         break;
                     case EPaintedBuildingCellType.Cutout:
-                        AddCutoutColumnVoxelList(voxelHashList, cellData, baseY);
+                        AddCutoutColumnVoxelList(voxelHashList, cellData, baseY, globalWallHeightGridCount);
                         break;
                 }
             }
@@ -169,9 +173,10 @@ namespace Mm_ProceduralBuilding
         private static void AddCutoutColumnVoxelList(
             HashSet<Vector3Int> voxelHashList,
             PaintedBuildingCellData cellData,
-            int baseY)
+            int baseY,
+            int globalWallHeightGridCount)
         {
-            int totalHeight = Mathf.Max(1, cellData.heightGridCount);
+            int totalHeight = globalWallHeightGridCount;
             int cutoutStart = Mathf.Clamp(cellData.cutoutStartHeightGridCount, 0, totalHeight - 1);
             int cutoutEnd = Mathf.Clamp(cellData.cutoutEndHeightGridCount, cutoutStart + 1, totalHeight);
             int originY = baseY + 1;

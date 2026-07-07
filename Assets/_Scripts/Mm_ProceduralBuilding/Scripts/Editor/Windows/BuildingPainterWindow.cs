@@ -13,10 +13,10 @@ namespace Mm_ProceduralBuilding.Editor
         private const string ConventionAssetPath = "Assets/_Scripts/Mm_ProceduralBuilding/So/BuildingGridConvention.asset";
         private const string BrushPresetFolderPath = "Assets/_Scripts/Mm_ProceduralBuilding/So/BrushPresets";
         private const string PlanPrefsKey = "Mm_ProceduralBuilding.BuildingPainter.PlanPath";
-        private const string ConventionPrefsKey = "Mm_ProceduralBuilding.BuildingPainter.ConventionPath";
         private const string GeneratorPrefsKey = "Mm_ProceduralBuilding.BuildingPainter.GeneratorId";
         private const string LeftWidthPrefsKey = "Mm_ProceduralBuilding.BuildingPainter.LeftWidth";
         private const string RightWidthPrefsKey = "Mm_ProceduralBuilding.BuildingPainter.RightWidth";
+        private const string ToolPanelTabPrefsKey = "Mm_ProceduralBuilding.BuildingPainter.ToolPanelTab";
         private const float MinCellPixelSize = 10f;
         private const float MaxCellPixelSize = 64f;
         private const float MinSideWidth = 130f;
@@ -108,6 +108,84 @@ namespace Mm_ProceduralBuilding.Editor
         private EWallExtendDirection wallExtendDirection = EWallExtendDirection.Outward;
 
         /// <summary>
+        /// 生成前清空楼层
+        /// </summary>
+        [SerializeField]
+        private bool roomClearBeforeGenerate;
+
+        /// <summary>
+        /// 房间锚点格坐标
+        /// </summary>
+        [SerializeField]
+        private Vector2Int roomAnchorGridPos;
+
+        /// <summary>
+        /// 房间宽度格数
+        /// </summary>
+        [SerializeField]
+        private int roomWidthGridCount = 6;
+
+        /// <summary>
+        /// 房间深度格数
+        /// </summary>
+        [SerializeField]
+        private int roomDepthGridCount = 6;
+
+        /// <summary>
+        /// 房间是否带门
+        /// </summary>
+        [SerializeField]
+        private bool roomEnableDoor = true;
+
+        /// <summary>
+        /// 房间门所在墙面
+        /// </summary>
+        [SerializeField]
+        private ERoomDoorWallSide roomDoorWallSide = ERoomDoorWallSide.Down;
+
+        /// <summary>
+        /// 房间门偏移格数
+        /// </summary>
+        [SerializeField]
+        private int roomDoorOffsetGridCount = 2;
+
+        /// <summary>
+        /// 房间门宽格数
+        /// </summary>
+        [SerializeField]
+        private int roomDoorWidthGridCount = 1;
+
+        /// <summary>
+        /// 阵列行数
+        /// </summary>
+        [SerializeField]
+        private int roomGridRowCount = 2;
+
+        /// <summary>
+        /// 阵列列数
+        /// </summary>
+        [SerializeField]
+        private int roomGridColumnCount = 2;
+
+        /// <summary>
+        /// 走廊宽度格数
+        /// </summary>
+        [SerializeField]
+        private int roomCorridorWidthGridCount = 1;
+
+        /// <summary>
+        /// 阵列门模式
+        /// </summary>
+        [SerializeField]
+        private ERoomGridDoorMode roomGridDoorMode = ERoomGridDoorMode.Same;
+
+        /// <summary>
+        /// 阵列门随机种子
+        /// </summary>
+        [SerializeField]
+        private int roomGridDoorRandomSeed = 12345;
+
+        /// <summary>
         /// 单格像素大小
         /// </summary>
         [SerializeField]
@@ -182,9 +260,19 @@ namespace Mm_ProceduralBuilding.Editor
         private Vector2 brushScrollPos;
 
         /// <summary>
-        /// 工具滚动位置
+        /// 绘制页签滚动位置
         /// </summary>
-        private Vector2 toolScrollPos;
+        private Vector2 toolPaintScrollPos;
+
+        /// <summary>
+        /// 通用页签滚动位置
+        /// </summary>
+        private Vector2 toolGeneralScrollPos;
+
+        /// <summary>
+        /// 工具面板页签索引
+        /// </summary>
+        private int toolPanelTabIndex;
 
         /// <summary>
         /// 是否存在未保存绘制数据
@@ -210,9 +298,12 @@ namespace Mm_ProceduralBuilding.Editor
         {
             leftPanelWidth = EditorPrefs.GetFloat(LeftWidthPrefsKey, leftPanelWidth);
             rightPanelWidth = EditorPrefs.GetFloat(RightWidthPrefsKey, rightPanelWidth);
+            toolPanelTabIndex = EditorPrefs.GetInt(ToolPanelTabPrefsKey, toolPanelTabIndex);
             EnsureDefaultAssets();
             LoadPersistedReferences();
+            EnsureConventionReference();
             SyncWallThicknessFromConvention();
+            SyncGlobalSettingsFromPlan();
             SyncGeneratorReferences();
         }
 
@@ -224,6 +315,7 @@ namespace Mm_ProceduralBuilding.Editor
             PersistReferences();
             EditorPrefs.SetFloat(LeftWidthPrefsKey, leftPanelWidth);
             EditorPrefs.SetFloat(RightWidthPrefsKey, rightPanelWidth);
+            EditorPrefs.SetInt(ToolPanelTabPrefsKey, toolPanelTabIndex);
             AssetDatabase.SaveAssets();
         }
 
@@ -232,7 +324,7 @@ namespace Mm_ProceduralBuilding.Editor
         /// </summary>
         private void OnGUI()
         {
-            if (paintedPlan == null || convention == null || brushPresetList.Count == 0)
+            if (paintedPlan == null || brushPresetList.Count == 0)
                 EnsureDefaultAssets();
 
             Rect windowRect = new Rect(0f, 0f, position.width, position.height);
@@ -283,11 +375,9 @@ namespace Mm_ProceduralBuilding.Editor
                 DrawBrushButton(brushPreset);
             }
 
-            EditorGUILayout.Space(8f);
-            if (GUILayout.Button("一键清空当前楼层网格", GUILayout.Height(28f)))
-                ClearCurrentFloorGrid();
-
             GUILayout.FlexibleSpace();
+            DrawBrushGlobalSettings();
+            EditorGUILayout.Space(4f);
             if (GUILayout.Button("刷新默认笔刷", GUILayout.Height(28f)))
             {
                 EnsureAllBrushPresets();
@@ -296,6 +386,43 @@ namespace Mm_ProceduralBuilding.Editor
 
             EditorGUILayout.EndScrollView();
             GUILayout.EndArea();
+        }
+
+        /// <summary>
+        /// 绘制笔刷全局设置
+        /// </summary>
+        private void DrawBrushGlobalSettings()
+        {
+            EditorGUILayout.Space(8f);
+            EditorGUILayout.LabelField("笔刷设置", EditorStyles.boldLabel);
+
+            EditorGUI.BeginChangeCheck();
+            currentFloorIndex = Mathf.Max(0, EditorGUILayout.IntField("当前楼层", currentFloorIndex));
+            if (paintedPlan != null)
+                EditorGUILayout.LabelField("当前地面高度", $"Y = {paintedPlan.GetFloorBaseY(currentFloorIndex)}");
+
+            wallHeightGridCount = Mathf.Max(1, EditorGUILayout.IntField("全局墙体高度", wallHeightGridCount));
+            if (EditorGUI.EndChangeCheck())
+            {
+                cutoutStartHeightGridCount = Mathf.Clamp(cutoutStartHeightGridCount, 0, wallHeightGridCount - 1);
+                cutoutEndHeightGridCount = Mathf.Clamp(
+                    cutoutEndHeightGridCount,
+                    cutoutStartHeightGridCount + 1,
+                    wallHeightGridCount);
+
+                if (paintedPlan != null && paintedPlan.globalWallHeightGridCount != wallHeightGridCount)
+                {
+                    Undo.RecordObject(paintedPlan, "修改全局墙体高度");
+                    paintedPlan.globalWallHeightGridCount = wallHeightGridCount;
+                    EditorUtility.SetDirty(paintedPlan);
+                }
+            }
+
+            if (currentFloorIndex > 0)
+            {
+                if (GUILayout.Button("复制上一层布局", GUILayout.Height(22f)))
+                    CopyPreviousFloorLayout();
+            }
         }
 
         /// <summary>
@@ -338,6 +465,7 @@ namespace Mm_ProceduralBuilding.Editor
             DrawPaintedCells(localGridRect);
             DrawSelectionRect(localGridRect);
             DrawHoverCell(localGridRect);
+            DrawRoomHoverPreview(localGridRect);
             HandleGridInput(localGridRect, e);
             GUI.EndGroup();
         }
@@ -358,24 +486,51 @@ namespace Mm_ProceduralBuilding.Editor
         private void DrawToolPanel(Rect rect)
         {
             GUILayout.BeginArea(rect);
-            toolScrollPos = EditorGUILayout.BeginScrollView(toolScrollPos);
-            EditorGUILayout.Space(8f);
-            EditorGUILayout.LabelField("工具栏", EditorStyles.boldLabel);
-            EditorGUILayout.Space(4f);
+            EditorGUILayout.Space(6f);
+            int newToolPanelTabIndex = GUILayout.Toolbar(toolPanelTabIndex, new[] { "绘制", "通用" });
+            if (newToolPanelTabIndex != toolPanelTabIndex)
+            {
+                toolPanelTabIndex = newToolPanelTabIndex;
+                EditorPrefs.SetInt(ToolPanelTabPrefsKey, toolPanelTabIndex);
+            }
 
-            DrawAssetFields();
-            EditorGUILayout.Space(8f);
+            EditorGUILayout.Space(4f);
+            if (toolPanelTabIndex == 0)
+                DrawToolPaintTab();
+            else
+                DrawToolGeneralTab();
+
+            GUILayout.EndArea();
+        }
+
+        /// <summary>
+        /// 绘制工具页签
+        /// </summary>
+        private void DrawToolPaintTab()
+        {
+            toolPaintScrollPos = EditorGUILayout.BeginScrollView(toolPaintScrollPos);
+            EditorGUILayout.Space(4f);
             DrawBrushSettings();
             EditorGUILayout.Space(8f);
-            DrawViewSettings();
+            EditorGUILayout.HelpBox(GetGridHelpMessage(), MessageType.Info);
+            EditorGUILayout.EndScrollView();
+        }
+
+        /// <summary>
+        /// 绘制通用页签
+        /// </summary>
+        private void DrawToolGeneralTab()
+        {
+            toolGeneralScrollPos = EditorGUILayout.BeginScrollView(toolGeneralScrollPos);
+            EditorGUILayout.Space(4f);
+            DrawAssetFields();
             EditorGUILayout.Space(8f);
             DrawActionButtons();
             EditorGUILayout.Space(8f);
+            DrawViewSettings();
+            EditorGUILayout.Space(8f);
             DrawOptimizationPanel();
-
-            EditorGUILayout.HelpBox("在中间网格左键绘制 右键擦除 中键拖拽平移 滚轮缩放", MessageType.Info);
             EditorGUILayout.EndScrollView();
-            GUILayout.EndArea();
         }
 
         /// <summary>
@@ -387,11 +542,12 @@ namespace Mm_ProceduralBuilding.Editor
 
             EditorGUI.BeginChangeCheck();
             paintedPlan = (PaintedBuildingPlan)EditorGUILayout.ObjectField("绘制蓝图", paintedPlan, typeof(PaintedBuildingPlan), false);
-            convention = (BuildingGridConvention)EditorGUILayout.ObjectField("格子公约", convention, typeof(BuildingGridConvention), false);
             generator = (PaintedBuildingGenerator)EditorGUILayout.ObjectField("生成器", generator, typeof(PaintedBuildingGenerator), true);
             if (EditorGUI.EndChangeCheck())
             {
+                EnsureConventionReference();
                 SyncWallThicknessFromConvention();
+                SyncGlobalSettingsFromPlan();
                 SyncGeneratorReferences();
                 PersistReferences();
             }
@@ -408,11 +564,6 @@ namespace Mm_ProceduralBuilding.Editor
             if (EditorGUI.EndChangeCheck() && currentBrushPreset != null)
                 ApplyBrushPreset(currentBrushPreset);
 
-            currentFloorIndex = Mathf.Max(0, EditorGUILayout.IntField("当前楼层", currentFloorIndex));
-            if (convention != null)
-                EditorGUILayout.LabelField("当前地面高度", $"Y = {convention.GetFloorBaseY(currentFloorIndex)}");
-
-            wallHeightGridCount = Mathf.Max(1, EditorGUILayout.IntField("全局墙体高度", wallHeightGridCount));
             currentCellType = (EPaintedBuildingCellType)EditorGUILayout.EnumPopup("绘制类型", currentCellType);
 
             if (currentCellType == EPaintedBuildingCellType.Floor)
@@ -427,6 +578,23 @@ namespace Mm_ProceduralBuilding.Editor
                 cutoutEndHeightGridCount = Mathf.Clamp(EditorGUILayout.IntField("挖空终点高度", cutoutEndHeightGridCount), cutoutStartHeightGridCount + 1, wallHeightGridCount);
                 EditorGUILayout.HelpBox("挖空从地面上方的墙体开始计算 地面层不会被墙体或挖空覆盖", MessageType.Info);
             }
+
+            if (currentCellType == EPaintedBuildingCellType.Room)
+                DrawRoomBrushTools();
+
+            if (currentCellType == EPaintedBuildingCellType.Erase)
+                DrawEraseBrushTools();
+        }
+
+        /// <summary>
+        /// 绘制擦除笔刷工具
+        /// </summary>
+        private void DrawEraseBrushTools()
+        {
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.HelpBox("右键可逐格擦除 下方按钮可一键清空当前楼层全部地面和结构", MessageType.None);
+            if (GUILayout.Button("一键清空当前楼层网格", GUILayout.Height(28f)))
+                ClearCurrentFloorGrid();
         }
 
         /// <summary>
@@ -454,6 +622,54 @@ namespace Mm_ProceduralBuilding.Editor
             EditorGUILayout.HelpBox("基于当前楼层地面最外围圈墙 厚度包含最外圈本身", MessageType.None);
             if (GUILayout.Button("一键绘制墙体", GUILayout.Height(28f)))
                 PaintPerimeterWalls();
+        }
+
+        /// <summary>
+        /// 绘制房间笔刷工具
+        /// </summary>
+        private void DrawRoomBrushTools()
+        {
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.HelpBox(
+                "房间笔刷 = 矩形地面 + 四周一圈墙 + 可选门洞\n" +
+                "左键点击网格放置单个房间 或使用下方按钮生成阵列",
+                MessageType.Info);
+
+            roomClearBeforeGenerate = EditorGUILayout.Toggle("生成前清空当前楼层", roomClearBeforeGenerate);
+            roomAnchorGridPos = EditorGUILayout.Vector2IntField("房间左下角", roomAnchorGridPos);
+            roomWidthGridCount = Mathf.Max(2, EditorGUILayout.IntField("房间宽度", roomWidthGridCount));
+            roomDepthGridCount = Mathf.Max(2, EditorGUILayout.IntField("房间深度", roomDepthGridCount));
+            wallThicknessGridCount = Mathf.Max(1, EditorGUILayout.IntField("墙体厚度", wallThicknessGridCount));
+            wallExtendDirection = (EWallExtendDirection)EditorGUILayout.EnumPopup("延伸方向", wallExtendDirection);
+            roomEnableDoor = EditorGUILayout.Toggle("生成门洞", roomEnableDoor);
+
+            if (roomEnableDoor)
+            {
+                roomDoorWallSide = (ERoomDoorWallSide)EditorGUILayout.EnumPopup("门所在方向", roomDoorWallSide);
+                roomDoorOffsetGridCount = Mathf.Max(0, EditorGUILayout.IntField("门沿墙偏移", roomDoorOffsetGridCount));
+                roomDoorWidthGridCount = Mathf.Max(1, EditorGUILayout.IntField("房间门宽", roomDoorWidthGridCount));
+                cutoutStartHeightGridCount = Mathf.Clamp(EditorGUILayout.IntField("挖空起点高度", cutoutStartHeightGridCount), 0, wallHeightGridCount - 1);
+                cutoutEndHeightGridCount = Mathf.Clamp(EditorGUILayout.IntField("挖空终点高度", cutoutEndHeightGridCount), cutoutStartHeightGridCount + 1, wallHeightGridCount);
+            }
+
+            if (GUILayout.Button("在左下角生成单个房间", GUILayout.Height(28f)))
+                GenerateSingleRoom();
+
+            EditorGUILayout.Space(6f);
+            EditorGUILayout.LabelField("房间阵列", EditorStyles.boldLabel);
+            roomGridRowCount = Mathf.Max(1, EditorGUILayout.IntField("行数", roomGridRowCount));
+            roomGridColumnCount = Mathf.Max(1, EditorGUILayout.IntField("列数", roomGridColumnCount));
+            roomCorridorWidthGridCount = Mathf.Max(1, EditorGUILayout.IntField("走廊宽度", roomCorridorWidthGridCount));
+            roomGridDoorMode = (ERoomGridDoorMode)EditorGUILayout.EnumPopup("阵列门模式", roomGridDoorMode);
+
+            if (roomGridDoorMode == ERoomGridDoorMode.Symmetric)
+                EditorGUILayout.HelpBox("对称模式会按阵列中心镜像门方向和偏移", MessageType.None);
+
+            if (roomGridDoorMode == ERoomGridDoorMode.Random)
+                roomGridDoorRandomSeed = EditorGUILayout.IntField("门随机种子", roomGridDoorRandomSeed);
+
+            if (GUILayout.Button("生成房间阵列", GUILayout.Height(28f)))
+                GenerateRoomGrid();
         }
 
         /// <summary>
@@ -591,11 +807,61 @@ namespace Mm_ProceduralBuilding.Editor
         }
 
         /// <summary>
+        /// 绘制房间悬停预览
+        /// </summary>
+        private void DrawRoomHoverPreview(Rect gridRect)
+        {
+            if (currentCellType != EPaintedBuildingCellType.Room || !hasHoverGridPos)
+                return;
+
+            GetGridRectBounds(
+                hoverGridPos,
+                new Vector2Int(
+                    hoverGridPos.x + roomWidthGridCount - 1,
+                    hoverGridPos.y + roomDepthGridCount - 1),
+                out int minX,
+                out int maxX,
+                out int minZ,
+                out int maxZ);
+            Rect minRect = GridToWindowCellRect(new Vector2Int(minX, maxZ), gridRect);
+            Rect maxRect = GridToWindowCellRect(new Vector2Int(maxX, minZ), gridRect);
+            Rect previewRect = Rect.MinMaxRect(minRect.xMin, minRect.yMin, maxRect.xMax, maxRect.yMax);
+            Color color = GetCurrentBrushColor();
+            EditorGUI.DrawRect(previewRect, new Color(color.r, color.g, color.b, 0.22f));
+            Handles.BeginGUI();
+            Color oldColor = Handles.color;
+            Handles.color = new Color(color.r, color.g, color.b, 0.95f);
+            Handles.DrawAAPolyLine(
+                2f,
+                new Vector3(previewRect.xMin, previewRect.yMin),
+                new Vector3(previewRect.xMax, previewRect.yMin),
+                new Vector3(previewRect.xMax, previewRect.yMax),
+                new Vector3(previewRect.xMin, previewRect.yMax),
+                new Vector3(previewRect.xMin, previewRect.yMin));
+            Handles.color = oldColor;
+            Handles.EndGUI();
+        }
+
+        /// <summary>
+        /// 获取网格帮助信息
+        /// </summary>
+        private string GetGridHelpMessage()
+        {
+            if (currentCellType == EPaintedBuildingCellType.Room)
+                return "左键点击网格放置房间 右键擦除 中键拖拽平移 滚轮缩放";
+
+            return "在中间网格左键绘制 右键擦除 中键拖拽平移 滚轮缩放";
+        }
+
+        /// <summary>
         /// 绘制悬停格子
         /// </summary>
         private void DrawHoverCell(Rect gridRect)
         {
             if (!hasHoverGridPos)
+                return;
+
+            if (currentCellType == EPaintedBuildingCellType.Room)
                 return;
 
             Rect cellRect = GridToWindowCellRect(hoverGridPos, gridRect);
@@ -677,6 +943,18 @@ namespace Mm_ProceduralBuilding.Editor
 
             if (e.type == EventType.MouseDown && e.button == 0)
             {
+                if (currentCellType == EPaintedBuildingCellType.Room)
+                {
+                    if (hasHoverGridPos)
+                    {
+                        roomAnchorGridPos = hoverGridPos;
+                        GenerateSingleRoom();
+                    }
+
+                    e.Use();
+                    return;
+                }
+
                 isSelectingCells = true;
                 selectionStartGridPos = hoverGridPos;
                 selectionEndGridPos = hoverGridPos;
@@ -822,6 +1100,9 @@ namespace Mm_ProceduralBuilding.Editor
         /// </summary>
         private void PaintCell(Vector2Int gridPos)
         {
+            if (paintedPlan == null || currentCellType == EPaintedBuildingCellType.Room)
+                return;
+
             PaintedBuildingFloorData floorData = paintedPlan.GetOrCreateFloor(currentFloorIndex);
             PaintedBuildingCellData oldCellData = currentCellType == EPaintedBuildingCellType.Floor
                 ? floorData.FindFloorCell(gridPos)
@@ -907,6 +1188,36 @@ namespace Mm_ProceduralBuilding.Editor
         }
 
         /// <summary>
+        /// 复制上一层布局
+        /// </summary>
+        private void CopyPreviousFloorLayout()
+        {
+            if (paintedPlan == null || currentFloorIndex <= 0)
+                return;
+
+            int sourceFloorIndex = currentFloorIndex - 1;
+            var sourceFloorData = paintedPlan.FindFloor(sourceFloorIndex);
+            if (sourceFloorData == null
+                || (sourceFloorData.floorCellDataList.Count == 0 && sourceFloorData.structureCellDataList.Count == 0))
+            {
+                EditorUtility.DisplayDialog("复制布局", $"楼层 {sourceFloorIndex} 没有可复制的布局", "确定");
+                return;
+            }
+
+            Undo.RecordObject(paintedPlan, "复制上一层布局");
+            bool copied = paintedPlan.CopyFloorLayout(sourceFloorIndex, currentFloorIndex);
+            if (!copied)
+            {
+                EditorUtility.DisplayDialog("复制布局", "复制失败", "确定");
+                return;
+            }
+
+            EditorUtility.SetDirty(paintedPlan);
+            SaveAssets();
+            Repaint();
+        }
+
+        /// <summary>
         /// 填充地面范围
         /// </summary>
         private void FillFloorRange()
@@ -963,6 +1274,27 @@ namespace Mm_ProceduralBuilding.Editor
         }
 
         /// <summary>
+        /// 确保格子公约引用
+        /// </summary>
+        private void EnsureConventionReference()
+        {
+            if (generator != null && generator.convention != null)
+            {
+                convention = generator.convention;
+                return;
+            }
+
+            if (convention == null)
+                convention = LoadOrCreateAsset<BuildingGridConvention>(ConventionAssetPath);
+
+            if (generator != null && generator.convention == null)
+            {
+                generator.convention = convention;
+                EditorUtility.SetDirty(generator);
+            }
+        }
+
+        /// <summary>
         /// 同步墙体厚度
         /// </summary>
         private void SyncWallThicknessFromConvention()
@@ -971,6 +1303,99 @@ namespace Mm_ProceduralBuilding.Editor
                 return;
 
             wallThicknessGridCount = Mathf.Max(1, convention.WallThicknessGridCount);
+        }
+
+        /// <summary>
+        /// 生成单个程序化房间
+        /// </summary>
+        private void GenerateSingleRoom()
+        {
+            if (paintedPlan == null)
+                return;
+
+            Undo.RecordObject(paintedPlan, "生成单个房间");
+            if (roomClearBeforeGenerate)
+                paintedPlan.ClearFloor(currentFloorIndex);
+
+            var config = BuildSingleRoomConfig();
+            int paintedCellCount = BuildingRoomGenerator.GenerateSingleRoom(paintedPlan, currentFloorIndex, config);
+            EditorUtility.SetDirty(paintedPlan);
+            SaveAssets();
+            Repaint();
+
+            if (paintedCellCount <= 0)
+                EditorUtility.DisplayDialog("房间笔刷", "生成失败 请检查参数", "确定");
+        }
+
+        /// <summary>
+        /// 生成房间阵列
+        /// </summary>
+        private void GenerateRoomGrid()
+        {
+            if (paintedPlan == null)
+                return;
+
+            Undo.RecordObject(paintedPlan, "生成房间阵列");
+            if (roomClearBeforeGenerate)
+                paintedPlan.ClearFloor(currentFloorIndex);
+
+            var config = BuildRoomGridConfig();
+            int paintedCellCount = BuildingRoomGenerator.GenerateRoomGrid(paintedPlan, currentFloorIndex, config);
+            EditorUtility.SetDirty(paintedPlan);
+            SaveAssets();
+            Repaint();
+
+            if (paintedCellCount <= 0)
+                EditorUtility.DisplayDialog("房间笔刷", "生成失败 请检查参数", "确定");
+        }
+
+        /// <summary>
+        /// 构建单个房间配置
+        /// </summary>
+        private BuildingSingleRoomConfig BuildSingleRoomConfig()
+        {
+            return new BuildingSingleRoomConfig
+            {
+                anchorGridPos = roomAnchorGridPos,
+                widthGridCount = roomWidthGridCount,
+                depthGridCount = roomDepthGridCount,
+                wallThicknessGridCount = wallThicknessGridCount,
+                wallHeightGridCount = wallHeightGridCount,
+                wallExtendDirection = wallExtendDirection,
+                enableDoor = roomEnableDoor,
+                doorWallSide = roomDoorWallSide,
+                doorOffsetGridCount = roomDoorOffsetGridCount,
+                roomDoorWidthGridCount = roomDoorWidthGridCount,
+                cutoutStartHeightGridCount = cutoutStartHeightGridCount,
+                cutoutEndHeightGridCount = cutoutEndHeightGridCount
+            };
+        }
+
+        /// <summary>
+        /// 构建房间阵列配置
+        /// </summary>
+        private BuildingRoomGridConfig BuildRoomGridConfig()
+        {
+            return new BuildingRoomGridConfig
+            {
+                anchorGridPos = roomAnchorGridPos,
+                roomWidthGridCount = roomWidthGridCount,
+                roomDepthGridCount = roomDepthGridCount,
+                rowCount = roomGridRowCount,
+                columnCount = roomGridColumnCount,
+                corridorWidthGridCount = roomCorridorWidthGridCount,
+                wallThicknessGridCount = wallThicknessGridCount,
+                wallHeightGridCount = wallHeightGridCount,
+                wallExtendDirection = wallExtendDirection,
+                enableDoorPerRoom = roomEnableDoor,
+                doorWallSide = roomDoorWallSide,
+                doorOffsetGridCount = roomDoorOffsetGridCount,
+                roomDoorWidthGridCount = roomDoorWidthGridCount,
+                cutoutStartHeightGridCount = cutoutStartHeightGridCount,
+                cutoutEndHeightGridCount = cutoutEndHeightGridCount,
+                gridDoorMode = roomGridDoorMode,
+                gridDoorRandomSeed = roomGridDoorRandomSeed
+            };
         }
 
         /// <summary>
@@ -1124,9 +1549,19 @@ namespace Mm_ProceduralBuilding.Editor
                 return;
 
             currentCellType = brushPreset.cellType;
-            if (currentCellType == EPaintedBuildingCellType.Wall || currentCellType == EPaintedBuildingCellType.Cutout)
-                wallHeightGridCount = Mathf.Max(1, brushPreset.defaultHeightGridCount);
+            cutoutStartHeightGridCount = Mathf.Clamp(cutoutStartHeightGridCount, 0, wallHeightGridCount - 1);
+            cutoutEndHeightGridCount = Mathf.Clamp(cutoutEndHeightGridCount, cutoutStartHeightGridCount + 1, wallHeightGridCount);
+        }
 
+        /// <summary>
+        /// 同步蓝图全局设置
+        /// </summary>
+        private void SyncGlobalSettingsFromPlan()
+        {
+            if (paintedPlan == null)
+                return;
+
+            wallHeightGridCount = paintedPlan.GlobalWallHeightGridCount;
             cutoutStartHeightGridCount = Mathf.Clamp(cutoutStartHeightGridCount, 0, wallHeightGridCount - 1);
             cutoutEndHeightGridCount = Mathf.Clamp(cutoutEndHeightGridCount, cutoutStartHeightGridCount + 1, wallHeightGridCount);
         }
@@ -1232,9 +1667,7 @@ namespace Mm_ProceduralBuilding.Editor
         private void LoadPersistedReferences()
         {
             string planPath = EditorPrefs.GetString(PlanPrefsKey, PlanAssetPath);
-            string conventionPath = EditorPrefs.GetString(ConventionPrefsKey, ConventionAssetPath);
             paintedPlan = AssetDatabase.LoadAssetAtPath<PaintedBuildingPlan>(planPath) ?? paintedPlan;
-            convention = AssetDatabase.LoadAssetAtPath<BuildingGridConvention>(conventionPath) ?? convention;
             generator = LoadPersistedGenerator() ?? UnityEngine.Object.FindObjectOfType<PaintedBuildingGenerator>();
         }
 
@@ -1245,9 +1678,6 @@ namespace Mm_ProceduralBuilding.Editor
         {
             if (paintedPlan != null)
                 EditorPrefs.SetString(PlanPrefsKey, AssetDatabase.GetAssetPath(paintedPlan));
-
-            if (convention != null)
-                EditorPrefs.SetString(ConventionPrefsKey, AssetDatabase.GetAssetPath(convention));
 
             if (generator != null)
             {
@@ -1339,6 +1769,8 @@ namespace Mm_ProceduralBuilding.Editor
             {
                 case EPaintedBuildingCellType.Floor:
                     return 1;
+                case EPaintedBuildingCellType.Room:
+                    return 3;
                 default:
                     return 3;
             }
@@ -1351,6 +1783,9 @@ namespace Mm_ProceduralBuilding.Editor
         {
             if (brushPreset.cellType == EPaintedBuildingCellType.Erase)
                 return "擦除";
+
+            if (brushPreset.cellType == EPaintedBuildingCellType.Room)
+                return "房间";
 
             return GetCellTypeDisplayName(brushPreset.cellType);
         }
@@ -1370,6 +1805,8 @@ namespace Mm_ProceduralBuilding.Editor
                     return "挖空";
                 case EPaintedBuildingCellType.Erase:
                     return "擦除";
+                case EPaintedBuildingCellType.Room:
+                    return "房间";
                 default:
                     return "无";
             }

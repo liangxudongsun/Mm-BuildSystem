@@ -14,7 +14,9 @@ namespace Mm_ProceduralBuilding
         [LabelText("挖空")]
         Cutout,
         [LabelText("擦除")]
-        Erase
+        Erase,
+        [LabelText("房间")]
+        Room
     }
 
     public enum EWallExtendDirection
@@ -23,6 +25,28 @@ namespace Mm_ProceduralBuilding
         Outward,
         [LabelText("向内延伸")]
         Inward
+    }
+
+    public enum ERoomDoorWallSide
+    {
+        [LabelText("下")]
+        Down,
+        [LabelText("上")]
+        Up,
+        [LabelText("左")]
+        Left,
+        [LabelText("右")]
+        Right
+    }
+
+    public enum ERoomGridDoorMode
+    {
+        [LabelText("同向")]
+        Same,
+        [LabelText("对称")]
+        Symmetric,
+        [LabelText("随机")]
+        Random
     }
 
     [Serializable]

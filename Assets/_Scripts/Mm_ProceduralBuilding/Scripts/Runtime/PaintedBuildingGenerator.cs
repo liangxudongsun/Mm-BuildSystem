@@ -156,7 +156,8 @@ namespace Mm_ProceduralBuilding
         /// </summary>
         private void GenerateFloor(PaintedBuildingFloorData floorData, Transform root)
         {
-            int baseY = convention.GetFloorBaseY(floorData.floorIndex);
+            int baseY = paintedPlan.GetFloorBaseY(floorData.floorIndex);
+            int globalWallHeightGridCount = paintedPlan.GlobalWallHeightGridCount;
             var floorRoot = BuildingPrimitiveFactory.CreateGroup($"Floor_{floorData.floorIndex}", root);
             var floorLayerRoot = BuildingPrimitiveFactory.CreateGroup("FloorLayer", floorRoot);
             var structureLayerRoot = BuildingPrimitiveFactory.CreateGroup("StructureLayer", floorRoot);
@@ -174,7 +175,7 @@ namespace Mm_ProceduralBuilding
                 if (cellData == null)
                     continue;
 
-                GenerateStructureCell(cellData, baseY, structureLayerRoot);
+                GenerateStructureCell(cellData, baseY, globalWallHeightGridCount, structureLayerRoot);
             }
         }
 
@@ -189,15 +190,19 @@ namespace Mm_ProceduralBuilding
         /// <summary>
         /// 生成结构格子
         /// </summary>
-        private void GenerateStructureCell(PaintedBuildingCellData cellData, int baseY, Transform floorRoot)
+        private void GenerateStructureCell(
+            PaintedBuildingCellData cellData,
+            int baseY,
+            int globalWallHeightGridCount,
+            Transform floorRoot)
         {
             switch (cellData.cellType)
             {
                 case EPaintedBuildingCellType.Wall:
-                    GenerateSolidCell(cellData, baseY, floorRoot, 1, Mathf.Max(1, cellData.heightGridCount), GetMaterial(cellData));
+                    GenerateSolidCell(cellData, baseY, floorRoot, 1, globalWallHeightGridCount, GetMaterial(cellData));
                     break;
                 case EPaintedBuildingCellType.Cutout:
-                    GenerateCutoutCell(cellData, baseY, floorRoot);
+                    GenerateCutoutCell(cellData, baseY, globalWallHeightGridCount, floorRoot);
                     break;
             }
         }
@@ -222,9 +227,13 @@ namespace Mm_ProceduralBuilding
         /// <summary>
         /// 生成挖空墙体
         /// </summary>
-        private void GenerateCutoutCell(PaintedBuildingCellData cellData, int baseY, Transform floorRoot)
+        private void GenerateCutoutCell(
+            PaintedBuildingCellData cellData,
+            int baseY,
+            int globalWallHeightGridCount,
+            Transform floorRoot)
         {
-            int totalHeight = Mathf.Max(1, cellData.heightGridCount);
+            int totalHeight = globalWallHeightGridCount;
             int cutoutStart = Mathf.Clamp(cellData.cutoutStartHeightGridCount, 0, totalHeight - 1);
             int cutoutEnd = Mathf.Clamp(cellData.cutoutEndHeightGridCount, cutoutStart + 1, totalHeight);
             var material = GetMaterial(cellData);

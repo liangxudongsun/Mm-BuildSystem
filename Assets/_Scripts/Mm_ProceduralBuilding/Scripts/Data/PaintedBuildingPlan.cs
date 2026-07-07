@@ -14,6 +14,31 @@ namespace Mm_ProceduralBuilding
         public List<PaintedBuildingFloorData> paintFloorDataList = new();
 
         /// <summary>
+        /// 全局墙体高度
+        /// </summary>
+        [LabelText("全局墙体高度")]
+        [MinValue(1)]
+        public int globalWallHeightGridCount = 3;
+
+        /// <summary>
+        /// 全局墙体高度
+        /// </summary>
+        public int GlobalWallHeightGridCount => Mathf.Max(1, globalWallHeightGridCount);
+
+        /// <summary>
+        /// 单层占用高度
+        /// </summary>
+        public int FloorStrideGridCount => 1 + GlobalWallHeightGridCount;
+
+        /// <summary>
+        /// 获取楼层起点高度
+        /// </summary>
+        public int GetFloorBaseY(int floorIndex)
+        {
+            return Mathf.Max(0, floorIndex) * FloorStrideGridCount;
+        }
+
+        /// <summary>
         /// 获取或创建楼层
         /// </summary>
         public PaintedBuildingFloorData GetOrCreateFloor(int floorIndex)
@@ -60,6 +85,9 @@ namespace Mm_ProceduralBuilding
             int cutoutEndHeightGridCount)
         {
             var floorData = GetOrCreateFloor(floorIndex);
+            if (cellType == EPaintedBuildingCellType.Room)
+                return;
+
             if (cellType == EPaintedBuildingCellType.Erase)
             {
                 floorData.RemoveTopCell(gridPos);
@@ -98,6 +126,58 @@ namespace Mm_ProceduralBuilding
 
             floorData.floorCellDataList.Clear();
             floorData.structureCellDataList.Clear();
+        }
+
+        /// <summary>
+        /// 复制楼层布局
+        /// </summary>
+        public bool CopyFloorLayout(int sourceFloorIndex, int targetFloorIndex)
+        {
+            int safeSourceFloorIndex = Mathf.Max(0, sourceFloorIndex);
+            int safeTargetFloorIndex = Mathf.Max(0, targetFloorIndex);
+            if (safeSourceFloorIndex == safeTargetFloorIndex)
+                return false;
+
+            var sourceFloorData = FindFloor(safeSourceFloorIndex);
+            if (sourceFloorData == null)
+                return false;
+
+            var targetFloorData = GetOrCreateFloor(safeTargetFloorIndex);
+            targetFloorData.floorCellDataList.Clear();
+            targetFloorData.structureCellDataList.Clear();
+
+            foreach (var cellData in sourceFloorData.floorCellDataList)
+            {
+                if (cellData == null)
+                    continue;
+
+                targetFloorData.floorCellDataList.Add(CloneCellData(cellData));
+            }
+
+            foreach (var cellData in sourceFloorData.structureCellDataList)
+            {
+                if (cellData == null)
+                    continue;
+
+                targetFloorData.structureCellDataList.Add(CloneCellData(cellData));
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// 克隆格子数据
+        /// </summary>
+        private static PaintedBuildingCellData CloneCellData(PaintedBuildingCellData sourceCellData)
+        {
+            return new PaintedBuildingCellData
+            {
+                gridPos = sourceCellData.gridPos,
+                cellType = sourceCellData.cellType,
+                heightGridCount = sourceCellData.heightGridCount,
+                cutoutStartHeightGridCount = sourceCellData.cutoutStartHeightGridCount,
+                cutoutEndHeightGridCount = sourceCellData.cutoutEndHeightGridCount
+            };
         }
 
         /// <summary>
@@ -203,6 +283,7 @@ namespace Mm_ProceduralBuilding
         /// </summary>
         private void OnValidate()
         {
+            globalWallHeightGridCount = globalWallHeightGridCount <= 0 ? 3 : Mathf.Max(1, globalWallHeightGridCount);
             if (paintFloorDataList == null)
                 paintFloorDataList = new List<PaintedBuildingFloorData>();
 
